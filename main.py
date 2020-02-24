@@ -17,7 +17,9 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 def root():
     loggedIn, firstName, noOfItems = getLoginDetails()
     with sqlite3.connect("database.db") as conn:
+        print(conn)
         cur = conn.cursor()
+        print(cur)
         cur.execute(
             "SELECT productId, name, price, description, image, stock FROM products"
         )
