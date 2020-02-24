@@ -4,6 +4,58 @@
 <title>Your Cart</title>
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
+
+<script>
+class BanditAPI {
+    constructor() {
+        this.contextName = "banditMLContext";
+				this.storage = window.localStorage;
+    }
+
+		getContext() {
+				return JSON.parse(this.storage.getItem(this.contextName));
+		}
+
+		setContext(dict) {
+				this.storage.setItem(this.contextName, JSON.stringify(dict));
+		}
+
+		clearContext() {
+				this.storage.removeItem(this.contextName);
+		}
+
+		updateContext(dict) {
+		    var context = this.getContext();
+				if (context == null) {
+				    context = dict;
+				} else {
+					context = Object.assign({}, context, dict);
+				}
+				this.setContext(context);
+		}
+
+		getDecision(experimentId) {
+		    // make ajax? call to gradient-app
+				// how to know which experiment?
+				return {
+				    id: "abc123", // to join reward on
+						decision: [
+						    "VPN",
+								"Easy WP",
+								"SSL"
+						]
+				}
+		}
+
+		logReward(decisionId, reward) {
+		    // make ajax? call to gradient-app
+				console.log(this.getContext(), decisionId, reward);
+		}
+}
+
+var bandit = new BanditAPI()
+</script>
+
 </head>
 <body>
 <div id="title">
@@ -42,6 +94,9 @@
 			<hr id="seperator">
 			<div id="itemImage">
 				<img src={{url_for('static', filename='uploads/'+row[3])}} id="image"/>
+				<script>
+					bandit.updateContext({['addedProductId'.concat('{{row[0]}}')]: 1});
+				</script>
 			</div>
 			<div id="itemName">
 				<span id="itemNameTag">{{row[1]}}</span><br>
@@ -59,7 +114,19 @@
 		</div>
 	</div>
 </div>
-<a href="/checkout">Proceed to checkout</a>
+<a href="/checkout" onclick="bandit.logReward(decision.id, {{totalPrice}});">Proceed to checkout</a>
+<br>
+<div>
+	<h3>Based on your shopping cart we think you'll like:</h2>
+		<h3>Context: </h3><p id="contextDiv"></p>
+		<h3>Decision: </h3><p id="decisionDiv"></p>
+</div>
 </body>
 </html>
 
+<script>
+	var context = bandit.getContext();
+	var decision = bandit.getDecision("asdbhasbd1212");
+	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
+	document.getElementById("decisionDiv").innerHTML = JSON.stringify(decision);
+</script>
