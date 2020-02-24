@@ -5,6 +5,8 @@ from instamojo_wrapper import Instamojo
 import requests
 
 app = Flask(__name__)
+print(__name__)
+print(app)
 app.secret_key = "random string"
 UPLOAD_FOLDER = "static/uploads"
 ALLOWED_EXTENSIONS = set(["jpeg", "jpg", "png", "gif"])
