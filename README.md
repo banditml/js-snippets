@@ -12,3 +12,17 @@ Start the server:
 ```
 python main.py
 ```
+
+Deploy to heroku (on master branch):
+
+Get added as a collaborator to `dry-hamlet-33451`.
+
+```
+git push heroku master
+```
+
+Deploy current branch to heroku:
+
+```
+git push -f heroku HEAD:master
+```
