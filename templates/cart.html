@@ -4,7 +4,6 @@
 <title>Your Cart</title>
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script src={{ url_for('static', filename='js/banditMl.js') }}></script>
 </head>
 <body>
@@ -67,7 +66,7 @@
 <a href="/checkout" onclick="bandit.logReward(decision.id, {{totalPrice}});">Proceed to checkout</a>
 <br>
 <div>
-	<h3>Based on your shopping cart we think you'll like:</h2>
+	<h3>Bandit ML debug:</h2>
 		<h3>Context: </h3><p id="contextDiv"></p>
 		<h3>Decision: </h3><p id="decisionDiv"></p>
 </div>

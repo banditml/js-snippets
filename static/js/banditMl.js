@@ -40,18 +40,12 @@
 
 function BanditAPI () {
   this.contextName = "banditMLContext";
+  this.ipUrl = "https://api.ipify.org?format=json";
   this.storage = window.localStorage;
 }
 
-BanditAPI.prototype.getIpAddress = function(callback) {
-  return $.ajax({
-      type: 'GET',
-      url: 'https://api.ipify.org?format=json',
-      dataType: 'json',
-      success: function(response) {
-        response;
-      }
-  });
+BanditAPI.prototype.asyncGetRequest = function(url) {
+  return fetch(url, {method: 'GET'});
 }
 
 BanditAPI.prototype.getContext = function() {
@@ -81,8 +75,12 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     // how to know which experiment?
 
     // set the IP address before making a decision and logging context
-    var ip = this.getIpAddress();
-    ip.then(data => this.updateContext({ip: data.ip}));
+    var ipPromise = this.asyncGetRequest(this.ipUrl);
+    ipPromise.then(response => {
+      return response.json();
+    }).then(data => {
+      this.updateContext({ip: data.ip})
+    });
 
     return {
       id: "abc123", // to join reward on
