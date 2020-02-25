@@ -4,58 +4,8 @@
 <title>Your Cart</title>
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
-
-<script>
-class BanditAPI {
-    constructor() {
-        this.contextName = "banditMLContext";
-				this.storage = window.localStorage;
-    }
-
-		getContext() {
-				return JSON.parse(this.storage.getItem(this.contextName));
-		}
-
-		setContext(dict) {
-				this.storage.setItem(this.contextName, JSON.stringify(dict));
-		}
-
-		clearContext() {
-				this.storage.removeItem(this.contextName);
-		}
-
-		updateContext(dict) {
-		    var context = this.getContext();
-				if (context == null) {
-				    context = dict;
-				} else {
-					context = Object.assign({}, context, dict);
-				}
-				this.setContext(context);
-		}
-
-		getDecision(experimentId) {
-		    // make ajax? call to gradient-app
-				// how to know which experiment?
-				return {
-				    id: "abc123", // to join reward on
-						decision: [
-						    "VPN",
-								"Easy WP",
-								"SSL"
-						]
-				}
-		}
-
-		logReward(decisionId, reward) {
-		    // make ajax? call to gradient-app
-				console.log(this.getContext(), decisionId, reward);
-		}
-}
-
-var bandit = new BanditAPI()
-</script>
-
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src={{ url_for('static', filename='js/banditMl.js') }}></script>
 </head>
 <body>
 <div id="title">
