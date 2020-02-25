@@ -2,6 +2,7 @@ from flask import *
 import sqlite3, hashlib, os
 from werkzeug.utils import secure_filename
 from instamojo_wrapper import Instamojo
+from database import init_database
 import requests
 
 app = Flask(__name__)
@@ -12,6 +13,8 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(BASE_DIR, "database.db")
+init_database(db_path)
+
 
 # Home page
 @app.route("/")
