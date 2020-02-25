@@ -21,9 +21,7 @@ init_database(db_path)
 def root():
     loggedIn, firstName, noOfItems = getLoginDetails()
     with sqlite3.connect(db_path) as conn:
-        print(conn)
         cur = conn.cursor()
-        print(cur)
         cur.execute(
             "SELECT productId, name, price, description, image, stock FROM products"
         )
