@@ -44,6 +44,12 @@ function BanditAPI () {
   this.storage = window.localStorage;
 }
 
+BanditAPI.prototype.assert = function(condition, errString) {
+  if (condition == false) {
+    throw errString;
+  }
+}
+
 BanditAPI.prototype.asyncGetRequest = function(url) {
   return fetch(url, {method: 'GET'});
 }
@@ -60,27 +66,63 @@ BanditAPI.prototype.clearContext = function() {
     this.storage.removeItem(this.contextName);
 }
 
-BanditAPI.prototype.updateContext = function(dict) {
-    var context = this.getContext();
+BanditAPI.prototype.updateContextList = function(newContext) {
+    // for variable length features use this method
+    // i.e. productsInCart = [12, 1, 54, ...];
+    var self = this;
+    Object.keys(newContext).forEach(function(key) {
+      self.assert(
+        Array.isArray(newContext[key]),
+        `Key "${key}" is not an array.`
+      )
+    });
+
+    var context = self.getContext();
     if (context == null) {
-      context = dict;
+      context = newContext;
     } else {
-      context = Object.assign({}, context, dict);
+      Object.keys(newContext).forEach(function(key) {
+        if (key in context) {
+          context[key].push(...newContext[key]);
+        } else {
+          context[key] = newContext[key];
+        }
+      });
     }
-    this.setContext(context);
+    self.setContext(context);
+}
+
+BanditAPI.prototype.updateContextValue = function(newContext) {
+    // for typical features (not variable length) use this method
+    // i.e. cartValue = 35.99;
+    var self = this;
+    var context = self.getContext();
+    if (context == null) {
+      context = newContext;
+    } else {
+      context = Object.assign({}, context, newContext);
+    }
+    self.setContext(context);
 }
 
 BanditAPI.prototype.getDecision = function(experimentId) {
-    // make ajax? call to gradient-app
-    // how to know which experiment?
-
     // set the IP address before making a decision and logging context
     var ipPromise = this.asyncGetRequest(this.ipUrl);
     ipPromise.then(response => {
       return response.json();
     }).then(data => {
-      this.updateContext({ip: data.ip})
+      this.updateContextValue({ip: data.ip})
     });
+
+    // call gradient-app and get a decision
+    // how to know which experiment?
+    var context = this.getContext();
+
+    // clear/reset the context since the decision has been made?
+    // this should probably on clear the context relevant to
+    // the current experiment (not all the shared context)
+    // maybe do this with experiment ID's throughout
+    this.clearContext()
 
     return {
       id: "abc123", // to join reward on
