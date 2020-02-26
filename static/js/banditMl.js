@@ -40,8 +40,15 @@
 
 function BanditAPI () {
   this.contextName = "banditMLContext";
-  this.ipUrl = "https://api.ipify.org?format=json";
   this.storage = window.localStorage;
+
+  // bandit backend information
+  this.banditApikey = "0dc5dc79-95fc-3fa5-b141-9719983c32b0";
+  const banditHostUrl = "http://localhost:8000/api/"
+  this.banditDecisionEndpoint = banditHostUrl + "decision";
+
+  // URLs & hosts
+  this.ipUrl = "https://api.ipify.org?format=json";
 }
 
 BanditAPI.prototype.assert = function(condition, errString) {
@@ -50,7 +57,12 @@ BanditAPI.prototype.assert = function(condition, errString) {
   }
 }
 
-BanditAPI.prototype.asyncGetRequest = function(url) {
+BanditAPI.prototype.asyncGetRequest = function(url, body = null) {
+  if (body != null) {
+    data = encodeURIComponent(JSON.stringify(body));
+    url += "?data=";
+    url += data;
+  }
   return fetch(url, {method: 'GET'});
 }
 
@@ -117,21 +129,23 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     // call gradient-app and get a decision
     // how to know which experiment?
     var context = this.getContext();
+    var decisionPromise = this.asyncGetRequest(this.banditDecisionEndpoint, context);
 
-    // clear/reset the context since the decision has been made?
-    // this should probably on clear the context relevant to
-    // the current experiment (not all the shared context)
-    // maybe do this with experiment ID's throughout
-    this.clearContext()
-
-    return {
-      id: "abc123", // to join reward on
-      decision: [
-        "VPN",
-        "Easy WP",
-        "SSL"
-      ]
-    }
+    decisionPromise.then(response => {
+      return response.json();
+    }).then(decision => {
+      // clear/reset the context since the decision has been made?
+      // this should probably on clear the context relevant to
+      // the current experiment (not all the shared context)
+      // maybe do this with experiment ID's throughout
+      this.clearContext()
+      // TODO: just for debug - remove later
+      console.log(decision);
+      return decision
+    }).catch(function(e) {
+      console.error(e);
+      return {"message": "Decision request failed."};
+    })
 }
 
 BanditAPI.prototype.logReward = function(decisionId, reward) {
