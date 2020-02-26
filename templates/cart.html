@@ -44,7 +44,7 @@
 			<div id="itemImage">
 				<img src={{url_for('static', filename='uploads/'+row[3])}} id="image"/>
 				<script>
-					bandit.updateContext({['addedProductId'.concat('{{row[0]}}')]: 1});
+					bandit.updateContextList({productId: [{{row[0]}}]});
 				</script>
 			</div>
 			<div id="itemName">
@@ -60,6 +60,7 @@
 		<hr id="seperator">
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
+			<script>bandit.updateContextValue({['cartValue']: {{totalPrice}}});</script>
 		</div>
 	</div>
 </div>
