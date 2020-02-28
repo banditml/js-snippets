@@ -57,13 +57,21 @@ BanditAPI.prototype.assert = function(condition, errString) {
   }
 }
 
-BanditAPI.prototype.asyncGetRequest = function(url, body = null) {
-  if (body != null) {
+BanditAPI.prototype.asyncGetRequest = function(
+  url,
+  paramName = null,
+  body = null,
+  headersDict = {}
+) {
+  if (paramName != null && body != null) {
     data = encodeURIComponent(JSON.stringify(body));
-    url += "?data=";
-    url += data;
+    url += `?${paramName}=` + data;
   }
-  return fetch(url, {method: 'GET'});
+
+  return fetch(url, {
+      method: 'GET',
+      headers: headersDict
+  });
 }
 
 BanditAPI.prototype.getContext = function() {
@@ -129,7 +137,14 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     // call gradient-app and get a decision
     // how to know which experiment?
     var context = this.getContext();
-    var decisionPromise = this.asyncGetRequest(this.banditDecisionEndpoint, context);
+    var decisionPromise = this.asyncGetRequest(
+      url = this.banditDecisionEndpoint,
+      paramName = "context",
+      body = context,
+      headers = {
+        "Authorization": `ApiKey ${this.banditApikey}`
+      }
+    );
 
     decisionPromise.then(response => {
       return response.json();
@@ -140,7 +155,6 @@ BanditAPI.prototype.getDecision = function(experimentId) {
       // maybe do this with experiment ID's throughout
       this.clearContext()
       // TODO: just for debug - remove later
-      console.log(decision);
       return decision
     }).catch(function(e) {
       console.error(e);

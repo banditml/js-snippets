@@ -374,6 +374,24 @@ def checkout():
     )
 
 
+@app.route("/get_product", methods=["GET"])
+def get_product():
+    product_id = request.args.get("productId")
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""SELECT
+                products.productId,
+                products.name,
+                products.price,
+                products.image
+            FROM products
+            WHERE products.productId = {product_id}"""
+        )
+        product = cur.fetchone()
+    return jsonify({"productId": product})
+
+
 @app.route("/instamojo")
 def instamojo():
     return render_template("instamojo.html")
