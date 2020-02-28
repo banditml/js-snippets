@@ -4,6 +4,7 @@
 <title>Your Cart</title>
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script src={{ url_for('static', filename='js/banditMl.js') }}></script>
 </head>
 <body>
@@ -67,9 +68,11 @@
 <a href="/checkout" onclick="bandit.logReward(decision.id, {{totalPrice}});">Proceed to checkout</a>
 <br>
 <div>
-	<h3>Bandit ML debug:</h2>
+	<h2>Bandit ML debug logs:</h2>
 		<h3>Context: </h3><p id="contextDiv"></p>
 		<h3>Decision: </h3><p id="decisionDiv"></p>
+	<h2> Bandit ML Product Recommendation:</h2>
+		<h3>You should also buy: </h3><p id="recommendationDiv"></p>
 </div>
 </body>
 </html>
@@ -77,6 +80,15 @@
 <script>
 	var context = bandit.getContext();
 	var decision = bandit.getDecision("asdbhasbd1212");
+	// hardcode a productId for now as an example
+	decision = 4; // productId 4
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 	document.getElementById("decisionDiv").innerHTML = JSON.stringify(decision);
+
+	$.ajax({
+	  url: 'get_product?productId=' + decision,
+	  success: function(data) {
+	    $('.recommendationDiv').html(JSON.stringify(data));
+	  }
+	});
 </script>
