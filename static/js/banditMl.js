@@ -167,7 +167,6 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     );
 
     decisionPromise.then(response => {
-      console.log(response.json());
       return response.json();
     }).then(decision => {
       // clear/reset the context since the decision has been made?
