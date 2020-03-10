@@ -79,11 +79,10 @@
 
 <script>
 	var context = bandit.getContext();
-	var decision = bandit.getDecision("asdbhasbd1212");
-	// hardcode a productId for now as an example
-	decision = 4; // productId 4
+	bandit.getDecision("asdbhasbd1212").then((result) => {
+	  document.getElementById("decisionDiv").innerHTML = JSON.stringify(result.decision);
+  });
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
-	document.getElementById("decisionDiv").innerHTML = JSON.stringify(decision);
 
 	$.ajax({
 	  url: 'get_product?productId=' + decision,
