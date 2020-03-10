@@ -38,13 +38,12 @@
 // _________________________________________██_______________
 
 
-function BanditAPI () {
+function BanditAPI (apiKey) {
   this.contextName = "banditMLContext";
   this.storage = window.localStorage;
 
   // bandit backend information
-  // this.banditApikey = "0dc5dc79-95fc-3fa5-b141-9719983c32b0";
-  this.banditApikey = "c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c";
+  this.banditApikey = apiKey;
   const banditHostUrl = "http://localhost:8000/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
@@ -59,7 +58,7 @@ BanditAPI.prototype.assert = function(condition, errString) {
   }
 };
 
-BanditAPI.prototype.asyncGetRequest = function(
+BanditAPI.prototype.asyncGetRequest = async function(
   url,
   paramName = null,
   body = null,
@@ -70,10 +69,11 @@ BanditAPI.prototype.asyncGetRequest = function(
     url += `?${paramName}=` + data;
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
       method: 'GET',
       headers: headersDict
   });
+  return await response.json();
 };
 
 BanditAPI.prototype.asyncPostRequest = async function postData(
@@ -105,6 +105,7 @@ BanditAPI.prototype.clearContext = function() {
     this.storage.removeItem(this.contextName);
 };
 
+// TODO: merge with updateContextValue and just have one updateContext?
 BanditAPI.prototype.updateContextList = function(newContext) {
     // for variable length features use this method
     // i.e. productsInCart = [12, 1, 54, ...];
@@ -148,7 +149,7 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     // set the IP address before making a decision and logging context
     let ipPromise = this.asyncGetRequest(this.ipUrl);
     ipPromise.then(response => {
-      return response.json();
+      return response;
     }).then(data => {
       this.updateContextValue({ip: data.ip})
     });
@@ -156,7 +157,6 @@ BanditAPI.prototype.getDecision = function(experimentId) {
     // call gradient-app and get a decision
     // how to know which experiment?
     let context = this.getContext();
-    console.log(context);
     let decisionPromise = this.asyncGetRequest(
       url = this.banditDecisionEndpoint,
       paramName = "context",
@@ -166,16 +166,8 @@ BanditAPI.prototype.getDecision = function(experimentId) {
       }
     );
 
-    decisionPromise.then(response => {
-      return response.json();
-    }).then(decision => {
-      // clear/reset the context since the decision has been made?
-      // this should probably on clear the context relevant to
-      // the current experiment (not all the shared context)
-      // maybe do this with experiment ID's throughout
-      this.clearContext()
-      // TODO: just for debug - remove later
-      return decision;
+    return decisionPromise.then(response => {
+      return response;
     }).catch(function(e) {
       console.error(e);
       return {"message": "Decision request failed."};
@@ -183,8 +175,6 @@ BanditAPI.prototype.getDecision = function(experimentId) {
 };
 
 BanditAPI.prototype.logReward = function(decisionId, reward) {
-  console.log(this.getContext(), decisionId, reward);
-  // make ajax? call to gradient-app
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
@@ -192,9 +182,10 @@ BanditAPI.prototype.logReward = function(decisionId, reward) {
     decisionId: decisionId,
     reward: reward,
   }).then(response => {
-    console.log(response);
     return response;
   });
 };
 
-var bandit = new BanditAPI();
+
+// var bandit = new BanditAPI("0dc5dc79-95fc-3fa5-b141-9719983c32b0");
+var bandit = new BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c");
