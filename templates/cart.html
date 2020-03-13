@@ -89,7 +89,11 @@
   async function modHtml(recs) {
     document.getElementById("decisionDiv").innerHTML = JSON.stringify(recs);
   }
-	bandit.getDecision("asdbhasbd1212", getProductRecs, null, modHtml);
+	bandit.getDecision(
+	  "exp-id-we-give-to-you",
+    productRecs = getProductRecs,
+    populateProductRecs = modHtml
+  );
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 
 	$.ajax({
