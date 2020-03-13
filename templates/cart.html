@@ -5,7 +5,8 @@
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-<script type="text/javascript" src="https://d10t8xi8ymznsy.cloudfront.net/banditMl.min.js"></script>
+{#<script type="text/javascript" src="https://d10t8xi8ymznsy.cloudfront.net/banditMl.min.js"></script>#}
+  <script src={{ url_for('static', filename='js/banditMl.js') }}></script>
 <script src={{ url_for('static', filename='js/banditLocal.js') }}></script>
 </head>
 <body>
@@ -80,9 +81,19 @@
 
 <script>
 	var context = bandit.getContext();
-	bandit.getDecision("asdbhasbd1212").then((result) => {
-	  document.getElementById("decisionDiv").innerHTML = JSON.stringify(result.decision);
-  });
+  console.log(context);
+  var decision = 4;
+  async function getProductRecs() {
+    return ["a", "b", "c"]
+  }
+  async function modHtml(recs) {
+    document.getElementById("decisionDiv").innerHTML = JSON.stringify(recs);
+  }
+	bandit.getDecision(
+	  "exp-id-we-give-to-you",
+    productRecs = getProductRecs,
+    populateProductRecs = modHtml
+  );
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 
 	$.ajax({
