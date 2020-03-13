@@ -80,7 +80,6 @@
 </html>
 
 <script>
-  console.log('hello');
 	var context = bandit.getContext();
   console.log(context);
   var decision = 4;
@@ -88,14 +87,9 @@
     return ["a", "b", "c"]
   }
   async function modHtml(recs) {
-    console.log('hey');
-    console.log(recs);
     document.getElementById("decisionDiv").innerHTML = JSON.stringify(recs);
   }
-	bandit.getDecision("asdbhasbd1212", getProductRecs, null, modHtml).then((result) => {
-	  console.log(result);
-
-  });
+	bandit.getDecision("asdbhasbd1212", getProductRecs, null, modHtml);
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 
 	$.ajax({

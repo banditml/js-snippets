@@ -47,7 +47,7 @@ function BanditAPI (apiKey) {
   const banditHostUrl = "http://localhost:8000/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
-  this.banditLogDecisionEndpoint = `${banditHostUrl}decision/log`;
+  this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -174,7 +174,7 @@ BanditAPI.prototype.getDecision = async function (
   );
 
   return decisionPromise.then(async (response) => {
-    let decision = response.decision;
+    let loggedDecision = response;
     let productRecIds;
     if (productRecs) {
       if (response.isControl) {
@@ -201,7 +201,7 @@ BanditAPI.prototype.getDecision = async function (
           productRecIds = await result;
         }
       }
-      decision.decision = productRecIds;
+      loggedDecision.decision = productRecIds;
       if (populateProductRecs) {
         let result = populateProductRecs(productRecIds);
         if (result && result.then) {
@@ -209,7 +209,8 @@ BanditAPI.prototype.getDecision = async function (
         }
       }
       if (shouldLogDecision) {
-        this.logDecision(context, decision);
+        console.log(response);
+        this.logDecision(context, loggedDecision);
       }
     }
     return response;
