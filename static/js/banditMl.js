@@ -209,7 +209,6 @@ BanditAPI.prototype.getDecision = async function (
         }
       }
       if (shouldLogDecision) {
-        console.log(response);
         this.logDecision(context, loggedDecision);
       }
     }
