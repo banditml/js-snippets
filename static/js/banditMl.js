@@ -38,10 +38,9 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey, defaultExperimentId) {
+function BanditAPI (apiKey) {
   this.contextName = "banditMLContext";
   this.storage = window.localStorage;
-  this.defaultExperimentId = defaultExperimentId;
 
   // bandit backend information
   this.banditApikey = apiKey;
@@ -62,18 +61,23 @@ BanditAPI.prototype.assert = function(condition, errString) {
 
 BanditAPI.prototype.asyncGetRequest = async function(
   url,
-  paramName = null,
-  body = null,
-  headersDict = {}
+  params = {},
+  headers = {}
 ) {
-  if (paramName != null && body != null) {
-    const data = encodeURIComponent(JSON.stringify(body));
-    url += `?${paramName}=` + data;
+  if (params) {
+    url += '?'
+  }
+  for (const paramName in params) {
+    const body = params[paramName];
+    if (paramName != null && body != null) {
+      const data = encodeURIComponent(JSON.stringify(body));
+      url += `${paramName}=${data}&`;
+    }
   }
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: headersDict
+    headers: headers
   });
   return await response.json();
 };
@@ -165,12 +169,10 @@ BanditAPI.prototype.getDecision = async function (
   // call gradient-app and get a decision
   // TODO: how to handle multiple experiments
   let context = this.getContext();
-  context.experimentId = experimentId || this.defaultExperimentId;
 
   let decisionPromise = this.asyncGetRequest(
     url = this.banditDecisionEndpoint,
-    paramName = "context",
-    body = context,
+    params = {context: context, experimentId: experimentId},
     headers = {
       "Authorization": `ApiKey ${this.banditApikey}`
     }
