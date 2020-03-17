@@ -38,9 +38,10 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey) {
+function BanditAPI (apiKey, defaultExperimentId) {
   this.contextName = "banditMLContext";
   this.storage = window.localStorage;
+  this.defaultExperimentId = defaultExperimentId;
 
   // bandit backend information
   this.banditApikey = apiKey;
@@ -147,7 +148,7 @@ BanditAPI.prototype.updateContextValue = function(newContext) {
 };
 
 BanditAPI.prototype.getDecision = async function (
-  experimentId,
+  experimentId = null,
   productRecs = null,
   filterRecs = null,
   populateProductRecs = null,
@@ -158,12 +159,14 @@ BanditAPI.prototype.getDecision = async function (
   ipPromise.then(response => {
     return response;
   }).then(data => {
-    this.updateContextValue({ip: data.ip})
+    this.updateContextValue({ipAddress: data.ip})
   });
 
   // call gradient-app and get a decision
-  // how to know which experiment?
+  // TODO: how to handle multiple experiments
   let context = this.getContext();
+  context.experimentId = experimentId || this.defaultExperimentId;
+
   let decisionPromise = this.asyncGetRequest(
     url = this.banditDecisionEndpoint,
     paramName = "context",
@@ -194,23 +197,25 @@ BanditAPI.prototype.getDecision = async function (
       } else {
         productRecIds = response.decision;
       }
-      if (filterRecs) {
-        // filterRecs can be function that directly returns IDs or promise
-        let result = filterRecs(productRecIds);
-        if (result && result.then) {
-          productRecIds = await result;
-        }
+    } else {
+      productRecIds = response.decision;
+    }
+    if (filterRecs) {
+      // filterRecs can be function that directly returns IDs or promise
+      let result = filterRecs(productRecIds);
+      if (result && result.then) {
+        productRecIds = await result;
       }
-      loggedDecision.decision = productRecIds;
-      if (populateProductRecs) {
-        let result = populateProductRecs(productRecIds);
-        if (result && result.then) {
-          await result;
-        }
+    }
+    loggedDecision.decision = productRecIds;
+    if (populateProductRecs) {
+      let result = populateProductRecs(productRecIds);
+      if (result && result.then) {
+        await result;
       }
-      if (shouldLogDecision) {
-        this.logDecision(context, loggedDecision);
-      }
+    }
+    if (shouldLogDecision) {
+      this.logDecision(context, loggedDecision);
     }
     return response;
   }).catch(function(e) {
@@ -244,4 +249,4 @@ BanditAPI.prototype.logReward = function(decisionId, reward) {
 };
 
 // var bandit = new BanditAPI("0dc5dc79-95fc-3fa5-b141-9719983c32b0");
-var bandit = new BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c");
+// var bandit = new BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c");
