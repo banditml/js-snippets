@@ -247,6 +247,3 @@ BanditAPI.prototype.logReward = function(decisionId, reward) {
     return response;
   });
 };
-
-// var bandit = new BanditAPI("0dc5dc79-95fc-3fa5-b141-9719983c32b0");
-// var bandit = new BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c");
