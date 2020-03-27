@@ -44,7 +44,7 @@ function BanditAPI (apiKey) {
 
   // bandit backend information
   this.banditApikey = apiKey;
-  const banditHostUrl = "http://localhost:8000/api/";
+  const banditHostUrl = "https://www.16ounc.es/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
   this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
@@ -53,10 +53,19 @@ function BanditAPI (apiKey) {
   this.ipUrl = "https://api.ipify.org?format=json";
 }
 
-BanditAPI.prototype.assert = function(condition, errString) {
-  if (condition === false) {
-    throw errString;
+BanditAPI.prototype.assert = function(condition, message) {
+  if (!condition) {
+    message = message || "Assertion failed.";
+    message += " Contact support@banditml.com for assistance.";
+    if (typeof Error !== "undefined") {
+      throw new Error(message);
+    }
+    throw message;
   }
+};
+
+BanditAPI.prototype.isFunction = function(functionToCheck) {
+  return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]';
 };
 
 BanditAPI.prototype.asyncGetRequest = async function(
@@ -142,6 +151,10 @@ BanditAPI.prototype.updateContextValue = function(newContext) {
   // for typical features (not variable length) use this method
   // i.e. cartValue = 35.99;
   const self = this;
+  self.assert(
+    typeof newContext === 'object' && newContext !== null,
+    "newContext must be a non-null object."
+  );
   let context = self.getContext();
   if (context == null) {
     context = newContext;
@@ -152,12 +165,19 @@ BanditAPI.prototype.updateContextValue = function(newContext) {
 };
 
 BanditAPI.prototype.getDecision = async function (
-  experimentId = null,
+  experimentId,
   productRecs = null,
   filterRecs = null,
   populateProductRecs = null,
   shouldLogDecision = true
 ) {
+  this.assert(
+    experimentId !== null && typeof experimentId === "string",
+    "experimentId needs to be non-null string."
+  );
+  if (experimentId !== null) {
+    this.assert()
+  }
   // set the IP address before making a decision and logging context
   let ipPromise = this.asyncGetRequest(this.ipUrl);
   ipPromise.then(response => {
@@ -182,6 +202,7 @@ BanditAPI.prototype.getDecision = async function (
     let loggedDecision = response;
     let productRecIds;
     if (productRecs) {
+      self.assert(self.isFunction(productRecs), "productRecs must be a function.");
       if (response.isControl) {
         // productRecs can be array of IDs
         if (Array.isArray(productRecs)) {
@@ -203,6 +224,7 @@ BanditAPI.prototype.getDecision = async function (
       productRecIds = response.decision;
     }
     if (filterRecs) {
+      self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
       // filterRecs can be function that directly returns IDs or promise
       let result = filterRecs(productRecIds);
       if (result && result.then) {
@@ -211,6 +233,10 @@ BanditAPI.prototype.getDecision = async function (
     }
     loggedDecision.decision = productRecIds;
     if (populateProductRecs) {
+      self.assert(
+        self.isFunction(populateProductRecs),
+        "populateProductRecs must be a function."
+      );
       let result = populateProductRecs(productRecIds);
       if (result && result.then) {
         await result;
@@ -227,6 +253,13 @@ BanditAPI.prototype.getDecision = async function (
 };
 
 BanditAPI.prototype.logDecision = function(context, decision) {
+  const decisionType = typeof decision;
+  this.assert(
+    Array.isArray(decision) ||
+    decisionType === "number" ||
+    decisionType === "string",
+    "decision must be an array, number, or string"
+  );
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
@@ -242,6 +275,8 @@ BanditAPI.prototype.logReward = function(decisionId, reward) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
+  this.assert(
+    reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     reward: reward,
