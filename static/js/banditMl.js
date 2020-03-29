@@ -126,30 +126,38 @@ BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId));
 };
 
-BanditAPI.prototype.validateFeaturesInContext = function (context, contextValidation) {
+BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
   const self = this;
+  let filteredFeatures = {};
   for (const featureName in context) {
     if (featureName === "ipAddress") {
+      filteredFeatures.ipAddress = context.ipAddress;
       continue;
     }
 
-    // self.assert(featureName in contextValidation, `Feature ${featureName} is not recognized. Please update your model in Bandit ML to include the feature.`);
-    const possibleValues = contextValidation[featureName];
-    if (possibleValues === null) {
-      continue;
-    }
-    if (Array.isArray(possibleValues)) {
+    const featureExists = contextValidation.hasOwnProperty(featureName);
+    if (featureExists) {
       const value = context[featureName];
-      self.assert(
-        possibleValues.includes(context[featureName]),
-        `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
-      );
+      const possibleValues = contextValidation[featureName];
+      filteredFeatures[featureName] = value;
+      if (possibleValues === null) {
+        // if no possible values restriction, e.g. with numeric type, no need to validate
+        continue;
+      }
+      if (Array.isArray(possibleValues)) {
+        self.assert(
+          possibleValues.includes(context[featureName]),
+          `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
+        );
+      }
+    } else {
+      console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`)
     }
   }
-  return true;
+  return filteredFeatures;
 };
 
-BanditAPI.prototype.validateContext = function(context, experimentId) {
+BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
   const self = this;
   self.assert(
     typeof context === 'object' && context !== null,
@@ -167,10 +175,10 @@ BanditAPI.prototype.validateContext = function(context, experimentId) {
     return validationPromise.then(response => {
       contextValidation = response;
       self.setItemInStorage(self.contextValidationKey, contextValidation);
-      return self.validateFeaturesInContext(context, contextValidation)
+      return self.validateAndFilterFeaturesInContext(context, contextValidation)
     });
   }
-  return self.validateFeaturesInContext(context, contextValidation);
+  return self.validateAndFilterFeaturesInContext(context, contextValidation);
 };
 
 BanditAPI.prototype.setItemInStorage = function(key, obj) {
@@ -179,7 +187,7 @@ BanditAPI.prototype.setItemInStorage = function(key, obj) {
 
 BanditAPI.prototype.setContext = function(obj, experimentId) {
   try {
-    this.validateContext(obj, experimentId);
+    this.validateAndFilterContext(obj, experimentId);
     this.setItemInStorage(this.contextName(experimentId), obj);
   } catch(e) {
     console.error(e);
@@ -281,7 +289,7 @@ BanditAPI.prototype.getDecision = async function (
   // call gradient-app and get a decision
   let context = self.getContext(experimentId);
   try {
-    self.validateContext(context, experimentId);
+    context = self.validateAndFilterContext(context, experimentId);
   } catch (e) {
     console.error(e);
     return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
