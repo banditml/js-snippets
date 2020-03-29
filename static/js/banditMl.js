@@ -39,7 +39,6 @@
 
 
 function BanditAPI (apiKey) {
-  this.contextName = "banditMLContext";
   this.contextValidationKey = "banditMLContextValidation";
   this.storage = window.localStorage;
 
@@ -119,9 +118,12 @@ BanditAPI.prototype.getItemFromStorage = function (storageKey) {
   return JSON.parse(this.storage.getItem(storageKey));
 };
 
-BanditAPI.prototype.getContext = function() {
-  // TODO: pass in experimentId into getContext?
-  return this.getItemFromStorage(this.contextName);
+BanditAPI.prototype.contextName = function(experimentId) {
+  return `banditMLContext-${experimentId}`
+};
+
+BanditAPI.prototype.getContext = function(experimentId) {
+  return this.getItemFromStorage(this.contextName(experimentId));
 };
 
 BanditAPI.prototype.validateFeaturesInContext = function (context, contextValidation) {
@@ -178,8 +180,7 @@ BanditAPI.prototype.setItemInStorage = function(key, obj) {
 BanditAPI.prototype.setContext = function(obj, experimentId) {
   try {
     this.validateContext(obj, experimentId);
-    // TODO: key context by experiment ID? or share context somehow?
-    this.setItemInStorage(this.contextName, obj);
+    this.setItemInStorage(this.contextName(experimentId), obj);
   } catch(e) {
     console.error(e);
   }
@@ -196,7 +197,7 @@ BanditAPI.prototype.updateContext = function(newContext, experimentId) {
     typeof newContext === 'object' && newContext !== null,
     "newContext must be a non-null object."
   );
-  let context = self.getContext();
+  let context = self.getContext(experimentId);
   if (context == null) {
     context = newContext;
   } else {
@@ -233,7 +234,6 @@ BanditAPI.prototype.setRecs = async function (
   populateProductRecs = null
 ) {
   const self = this;
-  console.log(productRecIds);
   self.validateDecision(productRecIds);
   if (filterRecs) {
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
@@ -253,7 +253,6 @@ BanditAPI.prototype.setRecs = async function (
       productRecIds = await result;
     }
   }
-  console.log(productRecIds);
   return productRecIds;
 };
 
@@ -280,13 +279,11 @@ BanditAPI.prototype.getDecision = async function (
   });
 
   // call gradient-app and get a decision
-  // TODO: how to handle multiple experiments
-  let context = self.getContext();
+  let context = self.getContext(experimentId);
   try {
     self.validateContext(context, experimentId);
   } catch (e) {
     console.error(e);
-    // TODO call filterRecs and populateProductRecs if its included.
     return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
   }
 
@@ -333,7 +330,6 @@ BanditAPI.prototype.validateDecision = function(decision) {
 
 BanditAPI.prototype.logDecision = function(context, decisionResponse) {
   const decision = decisionResponse.decision;
-  console.log(decision);
   this.validateDecision(decision);
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
