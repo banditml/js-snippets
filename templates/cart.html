@@ -47,7 +47,7 @@
 			<div id="itemImage">
 				<img src={{url_for('static', filename='uploads/'+row[3])}} id="image"/>
 				<script>
-					bandit.updateContextList({productId: [{{row[0]}}]});
+					bandit.updateContext({productsInCart: ["a"]}, experimentId);
 				</script>
 			</div>
 			<div id="itemName">
@@ -63,11 +63,11 @@
 		<hr id="seperator">
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
-			<script>bandit.updateContextValue({['cartValue']: {{totalPrice}}});</script>
+			<script>bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);</script>
 		</div>
 	</div>
 </div>
-<a href="/checkout" onclick="bandit.logReward(decision, {purchase: 1, cartValue: {{totalPrice}}});">Proceed to checkout</a>
+<a href="/checkout" onclick="bandit.logReward(decision, {purchase: 1, totalCartValue: {{totalPrice}}});">Proceed to checkout</a>
 <br>
 <div>
 	<h2>Bandit ML debug logs:</h2>
@@ -81,17 +81,17 @@
 
 <script>
 	var context = bandit.getContext();
-  console.log(context);
   var decision = 4;
   async function getProductRecs() {
-    return ["a", "b", "c"]
+    return ["a", "b", "c"];
   }
   async function modHtml(recs) {
     document.getElementById("decisionDiv").innerHTML = JSON.stringify(recs);
+    return recs;
   }
 	bandit.getDecision(
-	  "b64c6d9d-01e1-4766-afc4-56e5af5b4ba6",
-    productRecs = getProductRecs,
+    experimentId,
+    defaultProductRecs = getProductRecs,
     filterRecs = null,
     populateProductRecs = modHtml
   );
