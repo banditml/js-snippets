@@ -40,14 +40,17 @@
 
 function BanditAPI (apiKey) {
   this.contextName = "banditMLContext";
+  this.contextValidationKey = "banditMLContextValidation";
   this.storage = window.localStorage;
 
   // bandit backend information
   this.banditApikey = apiKey;
-  const banditHostUrl = "https://www.16ounc.es/api/";
+  // const banditHostUrl = "https://www.16ounc.es/api/";
+  const banditHostUrl = "http://localhost:8000/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
   this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
+  this.banditValidationEndpoint = `${banditHostUrl}validate`;
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -65,7 +68,11 @@ BanditAPI.prototype.assert = function(condition, message) {
 };
 
 BanditAPI.prototype.isFunction = function(functionToCheck) {
-  return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]';
+  if (!functionToCheck) {
+    return false;
+  }
+  const functionStr = {}.toString.call(functionToCheck);
+  return functionStr === '[object Function]' || functionStr === '[object AsyncFunction]';
 };
 
 BanditAPI.prototype.asyncGetRequest = async function(
@@ -108,48 +115,82 @@ BanditAPI.prototype.asyncPostRequest = async function postData(
   return await response.json(); // parses JSON response into native JavaScript objects
 };
 
-BanditAPI.prototype.getContext = function() {
-  return JSON.parse(this.storage.getItem(this.contextName));
+BanditAPI.prototype.getItemFromStorage = function (storageKey) {
+  return JSON.parse(this.storage.getItem(storageKey));
 };
 
-BanditAPI.prototype.setContext = function(dict) {
-  this.storage.setItem(this.contextName, JSON.stringify(dict));
+BanditAPI.prototype.getContext = function() {
+  // TODO: pass in experimentId into getContext?
+  return this.getItemFromStorage(this.contextName);
+};
+
+BanditAPI.prototype.validateFeaturesInContext = function (context, contextValidation) {
+  const self = this;
+  for (const featureName in context) {
+    if (featureName === "ipAddress") {
+      continue;
+    }
+
+    // self.assert(featureName in contextValidation, `Feature ${featureName} is not recognized. Please update your model in Bandit ML to include the feature.`);
+    const possibleValues = contextValidation[featureName];
+    if (possibleValues === null) {
+      continue;
+    }
+    if (Array.isArray(possibleValues)) {
+      const value = context[featureName];
+      self.assert(
+        possibleValues.includes(context[featureName]),
+        `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
+      );
+    }
+  }
+  return true;
+};
+
+BanditAPI.prototype.validateContext = function(context, experimentId) {
+  const self = this;
+  self.assert(
+    typeof context === 'object' && context !== null,
+    "Context must be a non-null object."
+  );
+  let contextValidation = self.getItemFromStorage(self.contextValidationKey);
+  if (!contextValidation) {
+    const validationPromise = self.asyncGetRequest(
+      url = self.banditValidationEndpoint,
+      params = {experimentId: experimentId},
+      headers = {
+        "Authorization": `ApiKey ${self.banditApikey}`
+      }
+    );
+    return validationPromise.then(response => {
+      contextValidation = response;
+      self.setItemInStorage(self.contextValidationKey, contextValidation);
+      return self.validateFeaturesInContext(context, contextValidation)
+    });
+  }
+  return self.validateFeaturesInContext(context, contextValidation);
+};
+
+BanditAPI.prototype.setItemInStorage = function(key, obj) {
+  this.storage.setItem(key, JSON.stringify(obj));
+};
+
+BanditAPI.prototype.setContext = function(obj, experimentId) {
+  try {
+    this.validateContext(obj, experimentId);
+    // TODO: key context by experiment ID? or share context somehow?
+    this.setItemInStorage(this.contextName, obj);
+  } catch(e) {
+    console.error(e);
+  }
 };
 
 BanditAPI.prototype.clearContext = function() {
   this.storage.removeItem(this.contextName);
 };
 
-// TODO: merge with updateContextValue and just have one updateContext?
-BanditAPI.prototype.updateContextList = function(newContext) {
-  // for variable length features use this method
-  // i.e. productsInCart = [12, 1, 54, ...];
-  const self = this;
-  Object.keys(newContext).forEach(function(key) {
-    self.assert(
-      Array.isArray(newContext[key]),
-      `Key "${key}" is not an array.`
-    )
-  });
-
-  let context = self.getContext();
-  if (context == null) {
-    context = newContext;
-  } else {
-    Object.keys(newContext).forEach(function(key) {
-      if (key in context) {
-        context[key].push(...newContext[key]);
-      } else {
-        context[key] = newContext[key];
-      }
-    });
-  }
-  self.setContext(context);
-};
-
-BanditAPI.prototype.updateContextValue = function(newContext) {
-  // for typical features (not variable length) use this method
-  // i.e. cartValue = 35.99;
+BanditAPI.prototype.updateContext = function(newContext, experimentId) {
+  // TODO: make this function async? benefit: make initial call non-blocking
   const self = this;
   self.assert(
     typeof newContext === 'object' && newContext !== null,
@@ -161,98 +202,126 @@ BanditAPI.prototype.updateContextValue = function(newContext) {
   } else {
     context = Object.assign({}, context, newContext);
   }
-  self.setContext(context);
+  self.setContext(context, experimentId);
+};
+
+BanditAPI.prototype.getControlRecs = async function (defaultProductRecs) {
+  const self = this;
+  self.assert(
+    Array.isArray(defaultProductRecs) || self.isFunction(defaultProductRecs),
+    "defaultProductRecs must be an array or function.");
+  let productRecIds;
+  // defaultProductRecs can be array of IDs
+  if (Array.isArray(defaultProductRecs)) {
+    productRecIds = defaultProductRecs;
+  } else {
+    // defaultProductRecs could also be a function that returns IDs or an async function that returns promise of IDs
+    let result = defaultProductRecs();
+    if (result && result.then) {
+      // if fn returns a promise, we await it then expect ids to be returned
+      productRecIds = await result;
+    } else {
+      productRecIds = result;
+    }
+  }
+  return productRecIds;
+};
+
+BanditAPI.prototype.setRecs = async function (
+  productRecIds = null,
+  filterRecs = null,
+  populateProductRecs = null
+) {
+  const self = this;
+  console.log(productRecIds);
+  self.validateDecision(productRecIds);
+  if (filterRecs) {
+    self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
+    // filterRecs can be function that directly returns IDs or promise
+    let result = filterRecs(productRecIds);
+    if (result && result.then) {
+      productRecIds = await result;
+    }
+  }
+  if (populateProductRecs) {
+    self.assert(
+      self.isFunction(populateProductRecs),
+      "populateProductRecs must be a function."
+    );
+    let result = populateProductRecs(productRecIds);
+    if (result && result.then) {
+      productRecIds = await result;
+    }
+  }
+  console.log(productRecIds);
+  return productRecIds;
 };
 
 BanditAPI.prototype.getDecision = async function (
   experimentId,
-  productRecs = null,
+  defaultProductRecs = null,
   filterRecs = null,
   populateProductRecs = null,
   shouldLogDecision = true
 ) {
-  this.assert(
-    experimentId !== null && typeof experimentId === "string",
-    "experimentId needs to be non-null string."
-  );
+  const self = this;
   if (experimentId !== null) {
-    this.assert()
+    self.assert(
+      experimentId !== null && typeof experimentId === "string",
+      "experimentId needs to be non-null string."
+    );
   }
   // set the IP address before making a decision and logging context
-  let ipPromise = this.asyncGetRequest(this.ipUrl);
+  let ipPromise = self.asyncGetRequest(self.ipUrl);
   ipPromise.then(response => {
     return response;
   }).then(data => {
-    this.updateContextValue({ipAddress: data.ip})
+    self.updateContext({ipAddress: data.ip}, experimentId);
   });
 
   // call gradient-app and get a decision
   // TODO: how to handle multiple experiments
-  let context = this.getContext();
+  let context = self.getContext();
+  try {
+    self.validateContext(context, experimentId);
+  } catch (e) {
+    console.error(e);
+    // TODO call filterRecs and populateProductRecs if its included.
+    return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
+  }
 
-  let decisionPromise = this.asyncGetRequest(
-    url = this.banditDecisionEndpoint,
+  let decisionPromise = self.asyncGetRequest(
+    url = self.banditDecisionEndpoint,
     params = {context: context, experimentId: experimentId},
     headers = {
-      "Authorization": `ApiKey ${this.banditApikey}`
+      "Authorization": `ApiKey ${self.banditApikey}`
     }
   );
-
   return decisionPromise.then(async (response) => {
     let loggedDecision = response;
     let productRecIds;
-    if (productRecs) {
-      self.assert(self.isFunction(productRecs), "productRecs must be a function.");
+    if (defaultProductRecs) {
       if (response.isControl) {
-        // productRecs can be array of IDs
-        if (Array.isArray(productRecs)) {
-          productRecIds = productRecs;
-        } else {
-          // productRecs could also be a function that returns IDs or an async function that returns promise of IDs
-          let result = productRecs();
-          if (result && result.then) {
-            // if fn returns a promise, we await it then expect ids to be returned
-            productRecIds = await result;
-          } else {
-            productRecIds = result;
-          }
-        }
+        productRecIds = await self.getControlRecs(defaultProductRecs);
       } else {
         productRecIds = response.decision;
       }
     } else {
       productRecIds = response.decision;
     }
-    if (filterRecs) {
-      self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
-      // filterRecs can be function that directly returns IDs or promise
-      let result = filterRecs(productRecIds);
-      if (result && result.then) {
-        productRecIds = await result;
-      }
-    }
+    productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
     loggedDecision.decision = productRecIds;
-    if (populateProductRecs) {
-      self.assert(
-        self.isFunction(populateProductRecs),
-        "populateProductRecs must be a function."
-      );
-      let result = populateProductRecs(productRecIds);
-      if (result && result.then) {
-        await result;
-      }
-    }
     if (shouldLogDecision) {
-      this.logDecision(context, loggedDecision);
+      self.logDecision(context, loggedDecision);
     }
     return response;
   }).catch(function(e) {
     console.error(e);
-    return {"message": "Decision request failed."};
+    return self.getControlRecs(defaultProductRecs);
   });
 };
 
-BanditAPI.prototype.logDecision = function(context, decision) {
+BanditAPI.prototype.validateDecision = function(decision) {
   const decisionType = typeof decision;
   this.assert(
     Array.isArray(decision) ||
@@ -260,6 +329,12 @@ BanditAPI.prototype.logDecision = function(context, decision) {
     decisionType === "string",
     "decision must be an array, number, or string"
   );
+};
+
+BanditAPI.prototype.logDecision = function(context, decisionResponse) {
+  const decision = decisionResponse.decision;
+  console.log(decision);
+  this.validateDecision(decision);
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
