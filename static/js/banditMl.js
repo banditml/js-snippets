@@ -154,7 +154,7 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
       filteredFeatures[featureName] = value;
       if (featureType === "N") {
         const valueType = typeof value;
-        self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`)
+        self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
       } else if (featureType === "C") {
         self.assert(
           Array.isArray(possibleValues),
@@ -176,10 +176,10 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
         self.assert(
           value.every(val => possibleValues.includes(val)),
           `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-        )
+        );
       }
     } else {
-      console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`)
+      console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`);
     }
   }
   return filteredFeatures;
@@ -191,8 +191,13 @@ BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
     typeof context === 'object' && context !== null,
     "Context must be a non-null object."
   );
+  const msInHr = 3600000;
   let contextValidation = self.getItemFromStorage(self.contextValidationKey(experimentId));
-  if (!contextValidation) {
+  // load contextValidation if it doesn't exist or is more than 4 hours old
+  if (
+    !contextValidation ||
+    (new Date().getTime() - contextValidation.generated_at_ms) / msInHr > 4
+  ) {
     const validationPromise = self.asyncGetRequest(
       url = self.banditValidationEndpoint,
       params = {experimentId: experimentId},
@@ -222,8 +227,8 @@ BanditAPI.prototype.setContext = function(obj, experimentId) {
   }
 };
 
-BanditAPI.prototype.clearContext = function() {
-  this.storage.removeItem(this.contextName);
+BanditAPI.prototype.clearContext = function(experimentId) {
+  this.storage.removeItem(this.contextName(experimentId));
 };
 
 BanditAPI.prototype.updateContext = function(newContext, experimentId) {
