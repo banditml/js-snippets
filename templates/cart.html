@@ -46,9 +46,6 @@
 			<hr id="seperator">
 			<div id="itemImage">
 				<img src={{url_for('static', filename='uploads/'+row[3])}} id="image"/>
-				<script>
-					bandit.updateContext({productsInCart: ["a"]}, experimentId);
-				</script>
 			</div>
 			<div id="itemName">
 				<span id="itemNameTag">{{row[1]}}</span><br>
@@ -63,7 +60,10 @@
 		<hr id="seperator">
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
-			<script>bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);</script>
+			<script>
+        bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);
+        bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);
+      </script>
 		</div>
 	</div>
 </div>

@@ -39,7 +39,6 @@
 
 
 function BanditAPI (apiKey) {
-  this.contextValidationKey = "banditMLContextValidation";
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -83,9 +82,16 @@ BanditAPI.prototype.asyncGetRequest = async function(
     url += '?'
   }
   for (const paramName in params) {
-    const body = params[paramName];
+    let body = params[paramName];
     if (paramName != null && body != null) {
-      const data = encodeURIComponent(JSON.stringify(body));
+      const bodyType = typeof body;
+      let data;
+      // no need to encode numbers / strings
+      if (bodyType === "number" || bodyType === "string") {
+        data = body;
+      } else {
+        data = encodeURIComponent(JSON.stringify(body));
+      }
       url += `${paramName}=${data}&`;
     }
   }
@@ -122,6 +128,10 @@ BanditAPI.prototype.contextName = function(experimentId) {
   return `banditMLContext-${experimentId}`
 };
 
+BanditAPI.prototype.contextValidationKey = function(experimentId) {
+  return `banditMLContextValidation-${experimentId}`;
+};
+
 BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId));
 };
@@ -138,17 +148,35 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
     const featureExists = contextValidation.hasOwnProperty(featureName);
     if (featureExists) {
       const value = context[featureName];
-      const possibleValues = contextValidation[featureName];
+      const featureSpec = contextValidation[featureName];
+      const possibleValues = featureSpec.possible_values;
+      const featureType = featureSpec.type;
       filteredFeatures[featureName] = value;
-      if (possibleValues === null) {
-        // if no possible values restriction, e.g. with numeric type, no need to validate
-        continue;
-      }
-      if (Array.isArray(possibleValues)) {
+      if (featureType === "N") {
+        const valueType = typeof value;
+        self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`)
+      } else if (featureType === "C") {
+        self.assert(
+          Array.isArray(possibleValues),
+          `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
+        );
         self.assert(
           possibleValues.includes(context[featureName]),
           `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
         );
+      } else if (featureType === "P") {
+        self.assert(
+          Array.isArray(possibleValues),
+          `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
+        );
+        self.assert(
+          Array.isArray(value),
+          `Feature ${featureName} is a product set that expects an array, but ${value} is not an array.`
+        );
+        self.assert(
+          value.every(val => possibleValues.includes(val)),
+          `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+        )
       }
     } else {
       console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`)
@@ -163,7 +191,7 @@ BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
     typeof context === 'object' && context !== null,
     "Context must be a non-null object."
   );
-  let contextValidation = self.getItemFromStorage(self.contextValidationKey);
+  let contextValidation = self.getItemFromStorage(self.contextValidationKey(experimentId));
   if (!contextValidation) {
     const validationPromise = self.asyncGetRequest(
       url = self.banditValidationEndpoint,
@@ -174,7 +202,7 @@ BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
     );
     return validationPromise.then(response => {
       contextValidation = response;
-      self.setItemInStorage(self.contextValidationKey, contextValidation);
+      self.setItemInStorage(self.contextValidationKey(experimentId), contextValidation);
       return self.validateAndFilterFeaturesInContext(context, contextValidation)
     });
   }
