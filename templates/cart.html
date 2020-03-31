@@ -74,9 +74,17 @@
 	<h2>Bandit ML debug logs:</h2>
 		<h3>Context: </h3><p id="contextDiv"></p>
 		<h3>Decision: </h3><p id="decisionDiv"></p>
-	<h2> Bandit ML Product Recommendation:</h2>
-		<h3>You should also buy: </h3><p id="recommendationDiv"></p>
+  <div class="recs" id="recs">
+    <h2> Bandit ML Product Recommendation:</h2>
+    <h3>You should also buy: </h3><p id="recommendationDiv"></p>
+  </div>
 </div>
+<style>
+  .recs {
+    margin-top: 1500px;
+    margin-bottom: 300px;
+  }
+</style>
 </body>
 </html>
 
@@ -87,7 +95,7 @@
     return ["a", "b", "c"];
   }
   async function modHtml(recs) {
-    document.getElementById("decisionDiv").innerHTML = JSON.stringify(recs);
+    document.getElementById("recommendationDiv").innerHTML = JSON.stringify(recs);
     return recs;
   }
 	bandit.getDecision(
