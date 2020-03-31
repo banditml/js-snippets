@@ -273,8 +273,9 @@ BanditAPI.prototype.setItemInStorage = function(key, obj) {
 
 BanditAPI.prototype.setContext = function(obj, experimentId) {
   try {
-    this.validateAndFilterContext(obj, experimentId);
-    this.setItemInStorage(this.contextName(experimentId), obj);
+    let context = this.validateAndFilterContext(obj, experimentId);
+    this.setItemInStorage(this.contextName(experimentId), context);
+    return context;
   } catch(e) {
     console.error(e);
   }
@@ -294,7 +295,7 @@ BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, re
         if (decision.ids && decision.ids.includes(currentProductId)) {
           // log reward for most recent decision that included this product
           // TODO: decide if this is best behavior or if we should only log for every decision
-          this.logReward(decision, {[this.rewardTypeClick]: 1}, experimentId);
+          this.logReward({[this.rewardTypeClick]: 1}, experimentId, currentProductId, decision.id);
           break;
         }
       }
@@ -319,9 +320,10 @@ BanditAPI.prototype.updateContext = function(newContext, experimentId) {
   } else {
     context = Object.assign({}, context, newContext);
   }
-  self.setContext(context, experimentId);
+  context = self.setContext(context, experimentId);
   self.updateSessionId();
   self.checkForShortTermReward(context, experimentId, this.rewardTypeClick);
+  return context;
 };
 
 BanditAPI.prototype.getControlRecs = async function (defaultProductRecs) {
@@ -397,10 +399,9 @@ BanditAPI.prototype.getDecision = async function (
     }
   );
   ipPromise.then(async (response) => {
-    self.updateContext({ipAddress: response.ip}, experimentId);
-    let context = self.getContext(experimentId);
+    let context;
     try {
-      context = self.validateAndFilterContext(context, experimentId);
+      context = self.updateContext({ipAddress: response.ip}, experimentId);
     } catch (e) {
       console.error(e);
       return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
@@ -434,7 +435,7 @@ BanditAPI.prototype.getDecision = async function (
         self.logDecision(context, loggedDecision, experimentId);
       }
       return response;
-    }).catch(function(e) {
+    }).catch(e => {
       console.error(e);
       return self.getControlRecs(defaultProductRecs);
     });
@@ -470,20 +471,26 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   });
 };
 
-BanditAPI.prototype.logReward = function(decision, reward, experimentId) {
+BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
-    reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
+    reward && typeof reward === "object", "Reward needs to be a non-empty object.");
+  this.assert(decision === null || typeof decision === "string", `Decision needs to be a single string ID or null. Got ${decision} instead.`)
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
-    decisionId: decision.id,
+    decisionId: decisionId,
     decision: decision,
     metrics: reward,
     experimentId: experimentId,
     mdpId: this.getSessionId()
   }).then(response => {
-    // TODO: clear session if reward is purchase(?)
+    if (decisionId === null) {
+      // TODO: edge case - do we clear session in case of failures too?
+      this.clearSession();
+    }
     return response;
-  });
+  }).catch(e => {
+    console.error(e);
+  })
 };
