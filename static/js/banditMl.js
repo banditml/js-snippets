@@ -39,6 +39,7 @@
 
 
 function BanditAPI (apiKey) {
+  // TODO: keep track of a session
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -78,7 +79,7 @@ BanditAPI.prototype.asyncGetRequest = async function(
   params = {},
   headers = {}
 ) {
-  if (params) {
+  if (params && Object.keys(params).length) {
     url += '?'
   }
   for (const paramName in params) {
@@ -275,7 +276,7 @@ BanditAPI.prototype.setRecs = async function (
   populateProductRecs = null
 ) {
   const self = this;
-  self.validateDecision(productRecIds);
+  self.validateDecisionIds(productRecIds);
   if (filterRecs) {
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
     // filterRecs can be function that directly returns IDs or promise
@@ -311,15 +312,19 @@ BanditAPI.prototype.getDecision = async function (
       "experimentId needs to be non-null string."
     );
   }
-  // set the IP address before making a decision and logging context
-  let ipPromise = self.asyncGetRequest(self.ipUrl);
-  ipPromise.then(response => {
-    return response;
-  }).then(data => {
-    self.updateContext({ipAddress: data.ip}, experimentId);
-  });
 
-  // call gradient-app and get a decision
+  let ipPromise = self.asyncGetRequest(self.ipUrl,
+    params = {},
+    headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  );
+  ipPromise.then(async (response) => {
+    self.updateContext({ipAddress: response.ip}, experimentId);
+  });
+  await ipPromise;
+
   let context = self.getContext(experimentId);
   try {
     context = self.validateAndFilterContext(context, experimentId);
@@ -328,6 +333,7 @@ BanditAPI.prototype.getDecision = async function (
     return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
   }
 
+  // call gradient-app and get a decision
   let decisionPromise = self.asyncGetRequest(
     url = self.banditDecisionEndpoint,
     params = {context: context, experimentId: experimentId},
@@ -337,20 +343,22 @@ BanditAPI.prototype.getDecision = async function (
   );
   return decisionPromise.then(async (response) => {
     let loggedDecision = response;
+    const originalIds = loggedDecision.decision.ids;
     let productRecIds;
     if (defaultProductRecs) {
       if (response.isControl) {
         productRecIds = await self.getControlRecs(defaultProductRecs);
       } else {
-        productRecIds = response.decision;
+        productRecIds = originalIds;
       }
     } else {
-      productRecIds = response.decision;
+      productRecIds = originalIds;
     }
     productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
-    loggedDecision.decision = productRecIds;
+    loggedDecision.decision.ids = productRecIds;
+    // TODO: replace with logic to only log decision when element is seen
     if (shouldLogDecision) {
-      self.logDecision(context, loggedDecision);
+      self.logDecision(context, loggedDecision, experimentId);
     }
     return response;
   }).catch(function(e) {
@@ -359,25 +367,29 @@ BanditAPI.prototype.getDecision = async function (
   });
 };
 
-BanditAPI.prototype.validateDecision = function(decision) {
-  const decisionType = typeof decision;
+BanditAPI.prototype.validateDecisionIds = function(decisionIds) {
+  const decisionIdsType = typeof decisionIds;
   this.assert(
-    Array.isArray(decision) ||
-    decisionType === "number" ||
-    decisionType === "string",
-    "decision must be an array, number, or string"
+    Array.isArray(decisionIds) ||
+    decisionIdsType === "number" ||
+    decisionIdsType === "string",
+    "decision IDs must be an array, number, or string"
   );
 };
 
-BanditAPI.prototype.logDecision = function(context, decisionResponse) {
+BanditAPI.prototype.logDecision = function(context, decisionResponse, experimentId) {
   const decision = decisionResponse.decision;
-  this.validateDecision(decision);
+  this.validateDecisionIds(decision.ids);
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
+  // TODO: pass session ID as MDP ID
   this.asyncPostRequest(this.banditLogDecisionEndpoint, headers, {
+    id: decisionResponse.id,
     context: context,
-    decision: decision
+    decision: decision,
+    experimentId: experimentId,
+    variation_id: decision.variation_id
   }).then(response => {
     return response;
   });
@@ -389,6 +401,8 @@ BanditAPI.prototype.logReward = function(decisionId, reward) {
   };
   this.assert(
     reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
+  // TODO: figure out how to assign reward to right decisions or send back all decisions in session?
+  // TODO: pass session ID as MDP ID
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     reward: reward,
