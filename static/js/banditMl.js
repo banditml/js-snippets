@@ -85,7 +85,6 @@ BanditAPI.prototype.updateSessionDecisions = function(decision) {
 };
 
 BanditAPI.prototype.updateSessionId = function() {
-  // TODO: make session expiry configurable?
   // TODO: support case where client has their own session ID they track
   // Create new session ID tracked in local storage if it doesn't exist
   // If session ID already exists, create a new one if last tracked action was more than hour ago
