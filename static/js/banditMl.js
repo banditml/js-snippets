@@ -64,9 +64,8 @@ BanditAPI.prototype.sessionDecisionsKey = function (experimentId) {
 
 BanditAPI.prototype.isTimeExpired = function (timeMs, numHrs) {
   const msInHr = 3600000;
-  return (new Date().getTime() - timeMs) / msInHr > numHrs);
+  return (new Date().getTime() - timeMs) / msInHr > numHrs;
 };
-
 
 BanditAPI.prototype.uuidv4 = function() {
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
@@ -77,7 +76,7 @@ BanditAPI.prototype.uuidv4 = function() {
 BanditAPI.prototype.getSessionDecisions = function (experimentId) {
   // Session decisions are ordered by most recent
   return this.getItemFromStorage(this.sessionDecisionsKey(experimentId)) || [];
-}
+};
 
 BanditAPI.prototype.updateSessionDecisions = function(decision) {
   let sessionDecisions = this.getSessionDecisions(experimentId);
