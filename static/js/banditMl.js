@@ -38,8 +38,7 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey) {
-  // TODO: keep track of a session
+function BanditAPI (apiKey, sessionLengthHrs) {
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -50,10 +49,67 @@ function BanditAPI (apiKey) {
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
   this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
   this.banditValidationEndpoint = `${banditHostUrl}validate`;
+  this.sessionIdKey = "BanditMLSessionId";
+  this.lastActionTimeKey = "BanditMLLastActionTime";
+  this.sessionLengthHrs = sessionLengthHrs || 2;
+  this.rewardTypeClick = "click";
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
 }
+
+BanditAPI.prototype.sessionDecisionsKey = function (experimentId) {
+  return `BanditMLSessionDecisions-${experimentId}`;
+};
+
+BanditAPI.prototype.isTimeExpired = function (timeMs, numHrs) {
+  const msInHr = 3600000;
+  return (new Date().getTime() - timeMs) / msInHr > numHrs;
+};
+
+BanditAPI.prototype.uuidv4 = function() {
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+  );
+};
+
+BanditAPI.prototype.getSessionDecisions = function (experimentId) {
+  // Session decisions are ordered by most recent
+  return this.getItemFromStorage(this.sessionDecisionsKey(experimentId)) || [];
+};
+
+BanditAPI.prototype.updateSessionDecisions = function(decision) {
+  let sessionDecisions = this.getSessionDecisions(experimentId);
+  sessionDecisions.unshift(decision);
+  this.setItemInStorage(this.sessionDecisionsKey(experimentId), sessionDecisions);
+};
+
+BanditAPI.prototype.updateSessionId = function() {
+  // TODO: support case where client has their own session ID they track
+  // Create new session ID tracked in local storage if it doesn't exist
+  // If session ID already exists, create a new one if last tracked action was more than hour ago
+  let sessionId = this.getItemFromStorage(this.sessionIdKey);
+  let lastActionTimeMs = this.getItemFromStorage(this.lastActionTimeKey);
+  if (!sessionId || !lastActionTimeMs ||
+      this.isTimeExpired(lastActionTimeMs, this.sessionLengthHrs)) {
+    let sessionId = this.uuidv4();
+    this.setItemInStorage(this.sessionIdKey, sessionId);
+    this.setItemInStorage(this.lastActionTimeKey, new Date().getTime());
+  }
+  return sessionId;
+};
+
+BanditAPI.prototype.clearSession = function() {
+  this.storage.removeItem(this.sessionIdKey);
+  this.storage.removeItem(this.lastActionTimeKey);
+  this.storage.removeItem(this.sessionDecisionsKey);
+};
+
+BanditAPI.prototype.getSessionId = function() {
+  // Get session ID from local storage or create one if it doesn't exist for some reason
+  return this.getItemFromStorage(this.sessionIdKey) || this.updateSessionId();
+  // TODO: support case where client has their own session ID they track
+};
 
 BanditAPI.prototype.assert = function(condition, message) {
   if (!condition) {
@@ -192,13 +248,9 @@ BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
     typeof context === 'object' && context !== null,
     "Context must be a non-null object."
   );
-  const msInHr = 3600000;
   let contextValidation = self.getItemFromStorage(self.contextValidationKey(experimentId));
   // load contextValidation if it doesn't exist or is more than 4 hours old
-  if (
-    !contextValidation ||
-    (new Date().getTime() - contextValidation.generated_at_ms) / msInHr > 4
-  ) {
+  if (!contextValidation || self.isTimeExpired(contextValidation.generated_at_ms, 4)) {
     const validationPromise = self.asyncGetRequest(
       url = self.banditValidationEndpoint,
       params = {experimentId: experimentId},
@@ -232,12 +284,34 @@ BanditAPI.prototype.clearContext = function(experimentId) {
   this.storage.removeItem(this.contextName(experimentId));
 };
 
+BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, rewardType) {
+  const sessionDecisions = this.getSessionDecisions(experimentId);
+  if (rewardType === this.rewardTypeClick) {
+    // TODO: force currentlyViewingProduct to exist as a feature for model
+    const currentProductId = context.currentlyViewingProduct;
+    if (currentProductId) {
+      for (let decision of sessionDecisions) {
+        if (decision.ids && decision.ids.includes(currentProductId)) {
+          // log reward for most recent decision that included this product
+          // TODO: decide if this is best behavior or if we should only log for every decision
+          this.logReward(decision, {[this.rewardTypeClick]: 1}, experimentId);
+          break;
+        }
+      }
+    }
+  }
+};
+
 BanditAPI.prototype.updateContext = function(newContext, experimentId) {
   // TODO: make this function async? benefit: make initial call non-blocking
   const self = this;
   self.assert(
     typeof newContext === 'object' && newContext !== null,
     "newContext must be a non-null object."
+  );
+  self.assert(
+    experimentId && typeof experimentId === "string",
+    `experimentId must be non-null string. Got ${experimentId} instead`
   );
   let context = self.getContext(experimentId);
   if (context == null) {
@@ -246,6 +320,8 @@ BanditAPI.prototype.updateContext = function(newContext, experimentId) {
     context = Object.assign({}, context, newContext);
   }
   self.setContext(context, experimentId);
+  self.updateSessionId();
+  self.checkForShortTermReward(context, experimentId, this.rewardTypeClick);
 };
 
 BanditAPI.prototype.getControlRecs = async function (defaultProductRecs) {
@@ -322,48 +398,46 @@ BanditAPI.prototype.getDecision = async function (
   );
   ipPromise.then(async (response) => {
     self.updateContext({ipAddress: response.ip}, experimentId);
-  });
-  await ipPromise;
-
-  let context = self.getContext(experimentId);
-  try {
-    context = self.validateAndFilterContext(context, experimentId);
-  } catch (e) {
-    console.error(e);
-    return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
-  }
-
-  // call gradient-app and get a decision
-  let decisionPromise = self.asyncGetRequest(
-    url = self.banditDecisionEndpoint,
-    params = {context: context, experimentId: experimentId},
-    headers = {
-      "Authorization": `ApiKey ${self.banditApikey}`
+    let context = self.getContext(experimentId);
+    try {
+      context = self.validateAndFilterContext(context, experimentId);
+    } catch (e) {
+      console.error(e);
+      return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
     }
-  );
-  return decisionPromise.then(async (response) => {
-    let loggedDecision = response;
-    const originalIds = loggedDecision.decision.ids;
-    let productRecIds;
-    if (defaultProductRecs) {
-      if (response.isControl) {
-        productRecIds = await self.getControlRecs(defaultProductRecs);
+
+    // call gradient-app and get a decision
+    let decisionPromise = self.asyncGetRequest(
+      url = self.banditDecisionEndpoint,
+      params = {context: context, experimentId: experimentId},
+      headers = {
+        "Authorization": `ApiKey ${self.banditApikey}`
+      }
+    );
+    return decisionPromise.then(async (response) => {
+      let loggedDecision = response;
+      const originalIds = loggedDecision.decision.ids;
+      let productRecIds;
+      if (defaultProductRecs) {
+        if (response.isControl) {
+          productRecIds = await self.getControlRecs(defaultProductRecs);
+        } else {
+          productRecIds = originalIds;
+        }
       } else {
         productRecIds = originalIds;
       }
-    } else {
-      productRecIds = originalIds;
-    }
-    productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
-    loggedDecision.decision.ids = productRecIds;
-    // TODO: replace with logic to only log decision when element is seen
-    if (shouldLogDecision) {
-      self.logDecision(context, loggedDecision, experimentId);
-    }
-    return response;
-  }).catch(function(e) {
-    console.error(e);
-    return self.getControlRecs(defaultProductRecs);
+      productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
+      loggedDecision.decision.ids = productRecIds;
+      // TODO: replace with logic to only log decision when element is seen
+      if (shouldLogDecision) {
+        self.logDecision(context, loggedDecision, experimentId);
+      }
+      return response;
+    }).catch(function(e) {
+      console.error(e);
+      return self.getControlRecs(defaultProductRecs);
+    });
   });
 };
 
@@ -383,30 +457,33 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
-  // TODO: pass session ID as MDP ID
+  this.updateSessionDecisions(decision);
   this.asyncPostRequest(this.banditLogDecisionEndpoint, headers, {
     id: decisionResponse.id,
     context: context,
     decision: decision,
     experimentId: experimentId,
+    mdpId: this.getSessionId(),
     variation_id: decision.variation_id
   }).then(response => {
     return response;
   });
 };
 
-BanditAPI.prototype.logReward = function(decisionId, reward) {
+BanditAPI.prototype.logReward = function(decision, reward, experimentId) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
     reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
-  // TODO: figure out how to assign reward to right decisions or send back all decisions in session?
-  // TODO: pass session ID as MDP ID
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
-    decisionId: decisionId,
-    reward: reward,
+    decisionId: decision.id,
+    decision: decision,
+    metrics: reward,
+    experimentId: experimentId,
+    mdpId: this.getSessionId()
   }).then(response => {
+    // TODO: clear session if reward is purchase(?)
     return response;
   });
 };
