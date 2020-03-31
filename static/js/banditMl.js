@@ -291,13 +291,14 @@ BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, re
     // TODO: force currentlyViewingProduct to exist as a feature for model
     const currentProductId = context.currentlyViewingProduct;
     if (currentProductId) {
-      sessionDecisions.forEach(decision => {
+      for (let decision of sessionDecisions) {
         if (decision.ids && decision.ids.includes(currentProductId)) {
-          // log reward for every decision that included this product
-          // TODO: decide if this is best behavior or if we should only log for most recent
-          this.logReward(decision.id, {[this.rewardTypeClick]: 1});
+          // log reward for most recent decision that included this product
+          // TODO: decide if this is best behavior or if we should only log for every decision
+          this.logReward(decision, {[this.rewardTypeClick]: 1}, experimentId);
+          break;
         }
-      });
+      }
     }
   }
 };
@@ -308,6 +309,10 @@ BanditAPI.prototype.updateContext = function(newContext, experimentId) {
   self.assert(
     typeof newContext === 'object' && newContext !== null,
     "newContext must be a non-null object."
+  );
+  self.assert(
+    experimentId && typeof experimentId === "string",
+    `experimentId must be non-null string. Got ${experimentId} instead`
   );
   let context = self.getContext(experimentId);
   if (context == null) {
@@ -394,48 +399,46 @@ BanditAPI.prototype.getDecision = async function (
   );
   ipPromise.then(async (response) => {
     self.updateContext({ipAddress: response.ip}, experimentId);
-  });
-  await ipPromise;
-
-  let context = self.getContext(experimentId);
-  try {
-    context = self.validateAndFilterContext(context, experimentId);
-  } catch (e) {
-    console.error(e);
-    return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
-  }
-
-  // call gradient-app and get a decision
-  let decisionPromise = self.asyncGetRequest(
-    url = self.banditDecisionEndpoint,
-    params = {context: context, experimentId: experimentId},
-    headers = {
-      "Authorization": `ApiKey ${self.banditApikey}`
+    let context = self.getContext(experimentId);
+    try {
+      context = self.validateAndFilterContext(context, experimentId);
+    } catch (e) {
+      console.error(e);
+      return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
     }
-  );
-  return decisionPromise.then(async (response) => {
-    let loggedDecision = response;
-    const originalIds = loggedDecision.decision.ids;
-    let productRecIds;
-    if (defaultProductRecs) {
-      if (response.isControl) {
-        productRecIds = await self.getControlRecs(defaultProductRecs);
+
+    // call gradient-app and get a decision
+    let decisionPromise = self.asyncGetRequest(
+      url = self.banditDecisionEndpoint,
+      params = {context: context, experimentId: experimentId},
+      headers = {
+        "Authorization": `ApiKey ${self.banditApikey}`
+      }
+    );
+    return decisionPromise.then(async (response) => {
+      let loggedDecision = response;
+      const originalIds = loggedDecision.decision.ids;
+      let productRecIds;
+      if (defaultProductRecs) {
+        if (response.isControl) {
+          productRecIds = await self.getControlRecs(defaultProductRecs);
+        } else {
+          productRecIds = originalIds;
+        }
       } else {
         productRecIds = originalIds;
       }
-    } else {
-      productRecIds = originalIds;
-    }
-    productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
-    loggedDecision.decision.ids = productRecIds;
-    // TODO: replace with logic to only log decision when element is seen
-    if (shouldLogDecision) {
-      self.logDecision(context, loggedDecision, experimentId);
-    }
-    return response;
-  }).catch(function(e) {
-    console.error(e);
-    return self.getControlRecs(defaultProductRecs);
+      productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
+      loggedDecision.decision.ids = productRecIds;
+      // TODO: replace with logic to only log decision when element is seen
+      if (shouldLogDecision) {
+        self.logDecision(context, loggedDecision, experimentId);
+      }
+      return response;
+    }).catch(function(e) {
+      console.error(e);
+      return self.getControlRecs(defaultProductRecs);
+    });
   });
 };
 
@@ -461,25 +464,27 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
     context: context,
     decision: decision,
     experimentId: experimentId,
-    variation_id: decision.variation_id,
-    mdp_id: this.getSessionId()
+    mdpId: this.getSessionId(),
+    variation_id: decision.variation_id
   }).then(response => {
     return response;
   });
 };
 
-BanditAPI.prototype.logReward = function(decisionId, reward) {
+BanditAPI.prototype.logReward = function(decision, reward, experimentId) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
     reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
-    decisionId: decisionId,
-    reward: reward,
-    mdp_id: this.getSessionId()
+    decisionId: decision.id,
+    decision: decision,
+    metrics: reward,
+    experimentId: experimentId,
+    mdpId: this.getSessionId()
   }).then(response => {
-    this.clearSession();
+    // TODO: clear session if reward is purchase(?)
     return response;
   });
 };
