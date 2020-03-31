@@ -38,7 +38,7 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey, sessionLengthHrs) {
+function BanditAPI (apiKey, recClassByExperimentId = {}, sessionLengthHrs) {
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -53,10 +53,29 @@ function BanditAPI (apiKey, sessionLengthHrs) {
   this.lastActionTimeKey = "BanditMLLastActionTime";
   this.sessionLengthHrs = sessionLengthHrs || 2;
   this.rewardTypeClick = "click";
+  this.recClassByExperimentId = recClassByExperimentId;
+  this.decisionsLoggedById = {};
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
 }
+
+BanditAPI.prototype.addDecisionHandler = function (context, decision, experimentId) {
+  const self = this;
+  const recClass = self.recClassByExperimentId[experimentId];
+  // TODO: handle multiple rec elements?
+  const elem = document.getElementsByClassName(recClass)[0];
+  if (elem) {
+    document.addEventListener("scroll", function () {
+      // prevent dupe decision logging
+      const decisionLogged = self.decisionsLoggedById[decision.id];
+      if (!decisionLogged && elem.getBoundingClientRect().bottom <= window.innerHeight) {
+        self.logDecision(context, decision, experimentId);
+        self.decisionsLoggedById[decision.id] = true;
+      }
+    });
+  }
+};
 
 BanditAPI.prototype.sessionDecisionsKey = function (experimentId) {
   return `BanditMLSessionDecisions-${experimentId}`;
@@ -430,9 +449,8 @@ BanditAPI.prototype.getDecision = async function (
       }
       productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
       loggedDecision.decision.ids = productRecIds;
-      // TODO: replace with logic to only log decision when element is seen
       if (shouldLogDecision) {
-        self.logDecision(context, loggedDecision, experimentId);
+        self.addDecisionHandler(context, loggedDecision, experimentId);
       }
       return response;
     }).catch(e => {
