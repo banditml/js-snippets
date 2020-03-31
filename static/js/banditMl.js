@@ -294,7 +294,7 @@ BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, re
         if (decision.ids && decision.ids.includes(currentProductId)) {
           // log reward for most recent decision that included this product
           // TODO: decide if this is best behavior or if we should only log for every decision
-          this.logReward(decision, {[this.rewardTypeClick]: 1}, experimentId);
+          this.logReward(currentProductId, {[this.rewardTypeClick]: 1}, experimentId, decision.id);
           break;
         }
       }
@@ -434,7 +434,7 @@ BanditAPI.prototype.getDecision = async function (
         self.logDecision(context, loggedDecision, experimentId);
       }
       return response;
-    }).catch(function(e) {
+    }).catch(e => {
       console.error(e);
       return self.getControlRecs(defaultProductRecs);
     });
@@ -470,20 +470,26 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   });
 };
 
-BanditAPI.prototype.logReward = function(decision, reward, experimentId) {
+BanditAPI.prototype.logReward = function(decision, reward, experimentId, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
-    reward && typeof reward === 'object', "Reward needs to be a non-empty object.");
+    reward && typeof reward === "object", "Reward needs to be a non-empty object.");
+  this.assert(typeof decision === "string", `Decision needs to be a single ID. Got ${decision} instead.`)
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
-    decisionId: decision.id,
+    decisionId: decisionId,
     decision: decision,
     metrics: reward,
     experimentId: experimentId,
     mdpId: this.getSessionId()
   }).then(response => {
-    // TODO: clear session if reward is purchase(?)
+    if (decisionId === null) {
+      // TODO: edge case - do we clear session in case of failures too?
+      this.clearSession();
+    }
     return response;
-  });
+  }).catch(e => {
+    console.error(e);
+  })
 };
