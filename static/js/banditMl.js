@@ -43,8 +43,8 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, sessionLengthHrs) {
 
   // bandit backend information
   this.banditApikey = apiKey;
-  // const banditHostUrl = "https://www.16ounc.es/api/";
-  const banditHostUrl = "http://localhost:8000/api/";
+  const banditHostUrl = "https://www.16ounc.es/api/";
+  // const banditHostUrl = "https://www.banditml.com/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
   this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
   this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
@@ -246,13 +246,20 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
           `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
         );
         self.assert(
-          Array.isArray(value),
-          `Feature ${featureName} is a product set that expects an array, but ${value} is not an array.`
+          typeof value === "string" || Array.isArray(value),
+          `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
         );
-        self.assert(
-          value.every(val => possibleValues.includes(val)),
-          `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-        );
+        if (Array.isArray(value)) {
+          self.assert(
+            value.every(val => possibleValues.includes(val)),
+            `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+          );
+        } else {
+          self.assert(
+            possibleValues.includes(value),
+            `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+          );
+        }
       }
     } else {
       console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`);
@@ -314,6 +321,8 @@ BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, re
         if (decision.ids && decision.ids.includes(currentProductId)) {
           // log reward for most recent decision that included this product
           // TODO: decide if this is best behavior or if we should only log for every decision
+          // TODO: assign to most recent decision only
+          // TODO: prevent dupe reward logging
           this.logReward({[this.rewardTypeClick]: 1}, experimentId, currentProductId, decision.id);
           break;
         }
@@ -378,8 +387,12 @@ BanditAPI.prototype.setRecs = async function (
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
     // filterRecs can be function that directly returns IDs or promise
     let result = filterRecs(productRecIds);
-    if (result && result.then) {
-      productRecIds = await result;
+    if (result) {
+      if (result.then) {
+        productRecIds = await result;
+      } else {
+        productRecIds = result;
+      }
     }
   }
   if (populateProductRecs) {
@@ -388,8 +401,12 @@ BanditAPI.prototype.setRecs = async function (
       "populateProductRecs must be a function."
     );
     let result = populateProductRecs(productRecIds);
-    if (result && result.then) {
-      productRecIds = await result;
+    if (result) {
+      if (result.then) {
+        productRecIds = await result;
+      } else {
+        productRecIds = result;
+      }
     }
   }
   return productRecIds;
