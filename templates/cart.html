@@ -6,7 +6,7 @@
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 {#<script type="text/javascript" src="https://d10t8xi8ymznsy.cloudfront.net/banditMl.min.js"></script>#}
-<script src={{ url_for('static', filename='js/banditMl.js') }}></script>
+<script src={{ url_for('static', filename='js/banditMl.min.js') }}></script>
 <script src={{ url_for('static', filename='js/banditLocal.js') }}></script>
 </head>
 <body>
@@ -61,14 +61,15 @@
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
 			<script>
-        bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);
+        {#bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);#}
         bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);
-        bandit.updateContext({currentlyViewingProduct: "a"}, experimentId);
+        bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xado1bB7"}, experimentId);
+        {#bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);#}
       </script>
 		</div>
 	</div>
 </div>
-<a href="#" onclick="bandit.logReward({a: 20}, experimentId);">Proceed to checkout</a>
+<a href="#" onclick="bandit.logReward({prod_RyWOwmE39wnEa2: 20}, experimentId);">Proceed to checkout</a>
 <br>
 <div>
 	<h2>Bandit ML debug logs:</h2>
@@ -92,8 +93,13 @@
 	var context = bandit.getContext(experimentId);
   var decision = 4;
   async function getProductRecs() {
-    return ["a", "b", "c"];
+    return ["prod_Kvg9l6xado1bB7", "prod_NXELwjqnzl3A4p", "prod_0YnEoqpxpwe7P6"];
   }
+
+  function filterRecs(recs) {
+    return recs.slice(0, 3);
+  }
+
   async function modHtml(recs) {
     document.getElementById("recommendationDiv").innerHTML = JSON.stringify(recs);
     return recs;
@@ -101,7 +107,7 @@
 	bandit.getDecision(
     experimentId,
     defaultProductRecs = getProductRecs,
-    filterRecs = null,
+    filterRecs = filterRecs,
     populateProductRecs = modHtml
   );
 	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
