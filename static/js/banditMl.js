@@ -38,11 +38,12 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey, recClassByExperimentId = {}, sessionLengthHrs) {
+function BanditAPI (apiKey, recClassByExperimentId = {}, debugMode = false, sessionLengthHrs) {
   this.storage = window.localStorage;
 
   // bandit backend information
   this.banditApikey = apiKey;
+  // const banditHostUrl = "http://localhost:8000/api/";
   const banditHostUrl = "https://www.16ounc.es/api/";
   // const banditHostUrl = "https://www.banditml.com/api/";
   this.banditDecisionEndpoint = banditHostUrl + "decision";
@@ -55,6 +56,7 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, sessionLengthHrs) {
   this.rewardTypeClick = "click";
   this.recClassByExperimentId = recClassByExperimentId;
   this.decisionsLoggedById = {};
+  this.debugMode = debugMode;
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -70,6 +72,9 @@ BanditAPI.prototype.addDecisionHandler = function (context, decision, experiment
       // prevent dupe decision logging
       const decisionLogged = self.decisionsLoggedById[decision.id];
       if (!decisionLogged && elem.getBoundingClientRect().bottom <= window.innerHeight) {
+        if (self.debugMode) {
+          console.log("User has seen decision. Auto logging it.");
+        }
         self.logDecision(context, decision, experimentId);
         self.decisionsLoggedById[decision.id] = true;
       }
@@ -97,7 +102,7 @@ BanditAPI.prototype.getSessionDecisions = function (experimentId) {
   return this.getItemFromStorage(this.sessionDecisionsKey(experimentId)) || [];
 };
 
-BanditAPI.prototype.updateSessionDecisions = function(decision) {
+BanditAPI.prototype.updateSessionDecisions = function(decision, experimentId) {
   let sessionDecisions = this.getSessionDecisions(experimentId);
   sessionDecisions.unshift(decision);
   this.setItemInStorage(this.sessionDecisionsKey(experimentId), sessionDecisions);
@@ -297,13 +302,17 @@ BanditAPI.prototype.setItemInStorage = function(key, obj) {
   this.storage.setItem(key, JSON.stringify(obj));
 };
 
-BanditAPI.prototype.setContext = function(obj, experimentId) {
+BanditAPI.prototype.setContext = async function(obj, experimentId) {
   try {
     let context = this.validateAndFilterContext(obj, experimentId);
+    if (context.then) {
+      context = await context;
+    }
     this.setItemInStorage(this.contextName(experimentId), context);
     return context;
   } catch(e) {
     console.error(e);
+    return context;
   }
 };
 
@@ -331,8 +340,7 @@ BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, re
   }
 };
 
-BanditAPI.prototype.updateContext = function(newContext, experimentId) {
-  // TODO: make this function async? benefit: make initial call non-blocking
+BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   const self = this;
   self.assert(
     typeof newContext === 'object' && newContext !== null,
@@ -349,8 +357,15 @@ BanditAPI.prototype.updateContext = function(newContext, experimentId) {
     context = Object.assign({}, context, newContext);
   }
   context = self.setContext(context, experimentId);
+  if (context.then) {
+    context = await context;
+  }
   self.updateSessionId();
   self.checkForShortTermReward(context, experimentId, this.rewardTypeClick);
+  if (self.debugMode) {
+    console.log('Updated context.');
+    console.log(context);
+  }
   return context;
 };
 
@@ -438,6 +453,9 @@ BanditAPI.prototype.getDecision = async function (
     let context;
     try {
       context = self.updateContext({ipAddress: response.ip}, experimentId);
+      if (context.then) {
+        context = await context;
+      }
     } catch (e) {
       console.error(e);
       return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
@@ -453,6 +471,10 @@ BanditAPI.prototype.getDecision = async function (
     );
     return decisionPromise.then(async (response) => {
       let loggedDecision = response;
+      if (self.debugMode) {
+        console.log("Got a decision from Bandit.");
+        console.log(loggedDecision);
+      }
       const originalIds = loggedDecision.decision.ids;
       let productRecIds;
       if (defaultProductRecs) {
@@ -467,12 +489,16 @@ BanditAPI.prototype.getDecision = async function (
       productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
       loggedDecision.decision.ids = productRecIds;
       if (shouldLogDecision) {
+        if (self.debugMode) {
+          console.log("Will log decision when user sees it");
+          console.log(loggedDecision);
+        }
         self.addDecisionHandler(context, loggedDecision, experimentId);
       }
       return response;
     }).catch(e => {
       console.error(e);
-      return self.getControlRecs(defaultProductRecs);
+      return self.setRecs(self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
     });
   });
 };
@@ -493,7 +519,7 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
-  this.updateSessionDecisions(decision);
+  this.updateSessionDecisions(decision, experimentId);
   this.asyncPostRequest(this.banditLogDecisionEndpoint, headers, {
     id: decisionResponse.id,
     context: context,
@@ -502,7 +528,13 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
     mdpId: this.getSessionId(),
     variation_id: decision.variation_id
   }).then(response => {
+    if (this.debugMode) {
+      console.log('Successfully logged decision');
+      console.log(response);
+    }
     return response;
+  }).catch(e => {
+    console.error(e);
   });
 };
 
@@ -520,6 +552,10 @@ BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, 
     experimentId: experimentId,
     mdpId: this.getSessionId()
   }).then(response => {
+    if (this.debugMode) {
+      console.log("Successfully logged reward.");
+      console.log(response);
+    }
     if (decisionId === null) {
       // TODO: edge case - do we clear session in case of failures too?
       this.clearSession();
