@@ -5,9 +5,9 @@
 <link rel="stylesheet" href={{url_for('static', filename='css/cart.css')}} />
 <link rel="stylesheet" href={{url_for('static', filename='css/topStyle.css') }} />
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-{#<script src={{ url_for('static', filename='js/banditMl.js') }}></script>#}
+<script src={{ url_for('static', filename='js/banditMl.js') }}></script>
 {#<script src="https://d10t8xi8ymznsy.cloudfront.net/banditMl.min.js"></script>#}
-<script src="https://gradient-app-bucket-public-staging.s3.amazonaws.com/snippets/banditMl.min.js"></script>
+{#<script src="https://gradient-app-bucket-public-staging.s3.amazonaws.com/snippets/banditMl.min.js"></script>#}
 <script src={{ url_for('static', filename='js/banditLocal.js') }}></script>
 </head>
 <body>
@@ -63,8 +63,8 @@
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
 			<script>
         {#bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);#}
-        bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);
-        {#bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);#}
+        {#bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);#}
+        bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);
       </script>
 		</div>
 	</div>
@@ -105,6 +105,7 @@
     return recs;
   }
   bandit.updateContext({currentlyViewingProduct: "prod_NXELwjqnzl3A4p"}, experimentId).then(function () {
+  {#bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(function () {#}
     bandit.getDecision(
       experimentId,
       defaultProductRecs = getProductRecs,
