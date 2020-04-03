@@ -38,7 +38,7 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey, recClassByExperimentId = {}, debugMode = false, sessionLengthHrs) {
+function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -52,11 +52,17 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, debugMode = false, sess
   this.banditValidationEndpoint = `${banditHostUrl}validate`;
   this.sessionIdKey = "BanditMLSessionId";
   this.lastActionTimeKey = "BanditMLLastActionTime";
-  this.sessionLengthHrs = sessionLengthHrs || 2;
   this.rewardTypeClick = "click";
   this.recClassByExperimentId = recClassByExperimentId;
   this.decisionsLoggedById = {};
-  this.debugMode = debugMode;
+  let defaultConfig = {
+    debugMode: false,
+    sessionLengthHrs: 0.5,
+    // checks for reward types to auto log
+    // e.g. ["click"]
+    autoLogReward: []
+  };
+  this.config = Object.assign(defaultConfig, config);
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -72,7 +78,7 @@ BanditAPI.prototype.addDecisionHandler = function (context, decision, experiment
       // prevent dupe decision logging
       const decisionLogged = self.decisionsLoggedById[decision.id];
       if (!decisionLogged && elem.getBoundingClientRect().bottom <= window.innerHeight) {
-        if (self.debugMode) {
+        if (self.config.debugMode) {
           console.log("User has seen decision. Auto logging it.");
         }
         self.logDecision(context, decision, experimentId);
@@ -115,7 +121,7 @@ BanditAPI.prototype.updateSessionId = function() {
   let sessionId = this.getItemFromStorage(this.sessionIdKey);
   let lastActionTimeMs = this.getItemFromStorage(this.lastActionTimeKey);
   if (!sessionId || !lastActionTimeMs ||
-      this.isTimeExpired(lastActionTimeMs, this.sessionLengthHrs)) {
+      this.isTimeExpired(lastActionTimeMs, this.config.sessionLengthHrs)) {
     let sessionId = this.uuidv4();
     this.setItemInStorage(this.sessionIdKey, sessionId);
     this.setItemInStorage(this.lastActionTimeKey, new Date().getTime());
@@ -309,10 +315,10 @@ BanditAPI.prototype.setContext = async function(obj, experimentId) {
       context = await context;
     }
     this.setItemInStorage(this.contextName(experimentId), context);
-    return context;
+    return context || {};
   } catch(e) {
     console.error(e);
-    return context;
+    return context || {};
   }
 };
 
@@ -321,10 +327,14 @@ BanditAPI.prototype.clearContext = function(experimentId) {
 };
 
 BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, rewardType) {
+  if (!this.config.autoLogReward) {
+    return;
+  }
   const sessionDecisions = this.getSessionDecisions(experimentId);
-  if (rewardType === this.rewardTypeClick) {
-    // TODO: force currentlyViewingProduct to exist as a feature for model
+  const autoClickReward = this.config.autoLogReward.click;
+  if (autoClickReward && rewardType === this.rewardTypeClick) {
     const currentProductId = context.currentlyViewingProduct;
+    self.assert(currentProductId, "autoLogReward enabled for click, but currentlyViewingProduct not found in context.")
     if (currentProductId) {
       for (let decision of sessionDecisions) {
         if (decision.ids && decision.ids.includes(currentProductId)) {
@@ -362,7 +372,7 @@ BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   }
   self.updateSessionId();
   self.checkForShortTermReward(context, experimentId, this.rewardTypeClick);
-  if (self.debugMode) {
+  if (self.config.debugMode) {
     console.log('Updated context.');
     console.log(context);
   }
@@ -397,6 +407,9 @@ BanditAPI.prototype.setRecs = async function (
   populateProductRecs = null
 ) {
   const self = this;
+  if (productRecIds.then) {
+    productRecIds = await productRecIds;
+  }
   self.validateDecisionIds(productRecIds);
   if (filterRecs) {
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
@@ -442,6 +455,12 @@ BanditAPI.prototype.getDecision = async function (
     );
   }
 
+  function setErrorRecs(e) {
+    console.error("Error getting decision, setting your default recs instead.")
+    console.error(e);
+    return self.setRecs(self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
+  }
+
   let ipPromise = self.asyncGetRequest(self.ipUrl,
     params = {},
     headers = {
@@ -452,13 +471,13 @@ BanditAPI.prototype.getDecision = async function (
   ipPromise.then(async (response) => {
     let context;
     try {
-      context = self.updateContext({ipAddress: response.ip}, experimentId);
+      const ipAddress = await response.ip;
+      context = self.updateContext({ipAddress: ipAddress}, experimentId);
       if (context.then) {
         context = await context;
       }
     } catch (e) {
-      console.error(e);
-      return self.setRecs(await self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
+      return setErrorRecs(e);
     }
 
     // call gradient-app and get a decision
@@ -471,7 +490,7 @@ BanditAPI.prototype.getDecision = async function (
     );
     return decisionPromise.then(async (response) => {
       let loggedDecision = response;
-      if (self.debugMode) {
+      if (self.config.debugMode) {
         console.log("Got a decision from Bandit.");
         console.log(loggedDecision);
       }
@@ -489,7 +508,7 @@ BanditAPI.prototype.getDecision = async function (
       productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
       loggedDecision.decision.ids = productRecIds;
       if (shouldLogDecision) {
-        if (self.debugMode) {
+        if (self.config.debugMode) {
           console.log("Will log decision when user sees it");
           console.log(loggedDecision);
         }
@@ -497,8 +516,7 @@ BanditAPI.prototype.getDecision = async function (
       }
       return response;
     }).catch(e => {
-      console.error(e);
-      return self.setRecs(self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
+      return setErrorRecs(e);
     });
   });
 };
@@ -528,7 +546,7 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
     mdpId: this.getSessionId(),
     variation_id: decision.variation_id
   }).then(response => {
-    if (this.debugMode) {
+    if (this.config.debugMode) {
       console.log('Successfully logged decision');
       console.log(response);
     }
@@ -552,7 +570,7 @@ BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, 
     experimentId: experimentId,
     mdpId: this.getSessionId()
   }).then(response => {
-    if (this.debugMode) {
+    if (this.config.debugMode) {
       console.log("Successfully logged reward.");
       console.log(response);
     }
