@@ -88,8 +88,8 @@ BanditAPI.prototype.addDecisionHandler = function (context, decision, experiment
   }
 };
 
-BanditAPI.prototype.sessionDecisionsKey = function (experimentId) {
-  return `BanditMLSessionDecisions-${experimentId}`;
+BanditAPI.prototype.lastDecisionKey = function (experimentId) {
+  return `BanditMLLastDecision-${experimentId}`;
 };
 
 BanditAPI.prototype.isTimeExpired = function (timeMs, numHrs) {
@@ -103,15 +103,12 @@ BanditAPI.prototype.uuidv4 = function() {
   );
 };
 
-BanditAPI.prototype.getSessionDecisions = function (experimentId) {
-  // Session decisions are ordered by most recent
-  return this.getItemFromStorage(this.sessionDecisionsKey(experimentId)) || [];
+BanditAPI.prototype.getLastDecision = function (experimentId) {
+  return this.getItemFromStorage(this.lastDecisionKey(experimentId));
 };
 
-BanditAPI.prototype.updateSessionDecisions = function(decision, experimentId) {
-  let sessionDecisions = this.getSessionDecisions(experimentId);
-  sessionDecisions.unshift(decision);
-  this.setItemInStorage(this.sessionDecisionsKey(experimentId), sessionDecisions);
+BanditAPI.prototype.updateLastDecision = function(decision, experimentId) {
+  this.setItemInStorage(this.lastDecisionKey(experimentId), decision);
 };
 
 BanditAPI.prototype.updateSessionId = function() {
@@ -132,7 +129,6 @@ BanditAPI.prototype.updateSessionId = function() {
 BanditAPI.prototype.clearSession = function() {
   this.storage.removeItem(this.sessionIdKey);
   this.storage.removeItem(this.lastActionTimeKey);
-  this.storage.removeItem(this.sessionDecisionsKey);
 };
 
 BanditAPI.prototype.getSessionId = function() {
@@ -238,39 +234,44 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
       const featureSpec = contextValidation[featureName];
       const possibleValues = featureSpec.possible_values;
       const featureType = featureSpec.type;
-      filteredFeatures[featureName] = value;
-      if (featureType === "N") {
-        const valueType = typeof value;
-        self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
-      } else if (featureType === "C") {
-        self.assert(
-          Array.isArray(possibleValues),
-          `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
-        );
-        self.assert(
-          possibleValues.includes(context[featureName]),
-          `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
-        );
-      } else if (featureType === "P") {
-        self.assert(
-          Array.isArray(possibleValues),
-          `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
-        );
-        self.assert(
-          typeof value === "string" || Array.isArray(value),
-          `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
-        );
-        if (Array.isArray(value)) {
+      try {
+        if (featureType === "N") {
+          const valueType = typeof value;
+          self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
+        } else if (featureType === "C") {
           self.assert(
-            value.every(val => possibleValues.includes(val)),
-            `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+            Array.isArray(possibleValues),
+            `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
           );
-        } else {
           self.assert(
-            possibleValues.includes(value),
-            `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+            possibleValues.includes(context[featureName]),
+            `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
           );
+        } else if (featureType === "P") {
+          self.assert(
+            Array.isArray(possibleValues),
+            `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
+          );
+          self.assert(
+            typeof value === "string" || Array.isArray(value),
+            `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
+          );
+          if (Array.isArray(value)) {
+            self.assert(
+              value.every(val => possibleValues.includes(val)),
+              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+            );
+          } else {
+            self.assert(
+              possibleValues.includes(value),
+              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
+            );
+          }
         }
+        filteredFeatures[featureName] = value;
+      } catch (e) {
+        console.error(e);
+        console.error(`Not including ${featureName} in context due to invalid/unrecognized value.`)
       }
     } else {
       console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`);
@@ -326,28 +327,30 @@ BanditAPI.prototype.clearContext = function(experimentId) {
   this.storage.removeItem(this.contextName(experimentId));
 };
 
-BanditAPI.prototype.checkForShortTermReward = function(context, experimentId, rewardType) {
+BanditAPI.prototype.checkForShortTermReward = function(context, experimentId) {
   if (!this.config.autoLogReward) {
     return;
   }
-  const sessionDecisions = this.getSessionDecisions(experimentId);
-  const autoClickReward = this.config.autoLogReward.click;
-  if (autoClickReward && rewardType === this.rewardTypeClick) {
-    const currentProductId = context.currentlyViewingProduct;
-    self.assert(currentProductId, "autoLogReward enabled for click, but currentlyViewingProduct not found in context.")
-    if (currentProductId) {
-      for (let decision of sessionDecisions) {
-        if (decision.ids && decision.ids.includes(currentProductId)) {
-          // log reward for most recent decision that included this product
-          // TODO: decide if this is best behavior or if we should only log for every decision
-          // TODO: assign to most recent decision only
-          // TODO: prevent dupe reward logging
-          this.logReward({[this.rewardTypeClick]: 1}, experimentId, currentProductId, decision.id);
-          break;
-        }
+  const lastDecision = this.getLastDecision(experimentId);
+  this.config.autoLogReward.forEach(reward => {
+    if (reward === this.rewardTypeClick) {
+      const currentProductId = context.currentlyViewingProduct;
+      this.assert(currentProductId, "autoLogReward enabled for click, but currentlyViewingProduct not found in context.");
+      if (this.config.debugMode) {
+        console.log(`Automatically checking for a ${reward} reward`);
       }
+      if (lastDecision && lastDecision.ids && lastDecision.ids.includes(currentProductId)) {
+        if (this.config.debugMode) {
+          console.log(`User previously saw the current product ${currentProductId} in the last set of recommendations. Auto logging reward.`);
+        }
+        this.logReward({[this.rewardTypeClick]: 1}, experimentId, currentProductId, lastDecision.id);
+      }
+    } else {
+      console.warn(`Unrecognized reward type: ${reward}`);
     }
-  }
+  });
+  // avoid dupe and improper short term reward logging by clearing lastDecision
+  this.updateLastDecision(null, experimentId);
 };
 
 BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
@@ -371,7 +374,13 @@ BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
     context = await context;
   }
   self.updateSessionId();
-  self.checkForShortTermReward(context, experimentId, this.rewardTypeClick);
+  try {
+    self.checkForShortTermReward(context, experimentId);
+  } catch (e) {
+    if (self.debugMode) {
+      console.warn('Unable to check for short term reward.')
+    }
+  }
   if (self.config.debugMode) {
     console.log('Updated context.');
     console.log(context);
@@ -537,7 +546,6 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
-  this.updateSessionDecisions(decision, experimentId);
   this.asyncPostRequest(this.banditLogDecisionEndpoint, headers, {
     id: decisionResponse.id,
     context: context,
@@ -550,6 +558,7 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
       console.log('Successfully logged decision');
       console.log(response);
     }
+    this.updateLastDecision(decision, experimentId);
     return response;
   }).catch(e => {
     console.error(e);

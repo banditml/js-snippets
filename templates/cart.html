@@ -62,9 +62,9 @@
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
 			<script>
-        {#bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);#}
+        bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);
         {#bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);#}
-        bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);
+        {#bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);#}
       </script>
 		</div>
 	</div>
@@ -93,7 +93,8 @@
 	var context = bandit.getContext(experimentId);
   var decision = 4;
   async function getProductRecs() {
-    return ["prod_Kvg9l6xado1bB7", "prod_NXELwjqnzl3A4p", "prod_0YnEoqpxpwe7P6"];
+    {#return ["prod_Kvg9l6xado1bB7", "prod_NXELwjqnzl3A4p", "prod_0YnEoqpxpwe7P6"];#}
+    return ["c", "b"];
   }
 
   function filterRecs(recs) {
@@ -104,8 +105,8 @@
     document.getElementById("recommendationDiv").innerHTML = JSON.stringify(recs);
     return recs;
   }
-  bandit.updateContext({currentlyViewingProduct: "prod_NXELwjqnzl3A4p"}, experimentId).then(function () {
-  {#bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(function () {#}
+  {#bandit.updateContext({currentlyViewingProduct: "prod_NXELwjqnzl3A4p"}, experimentId).then(function () {#}
+  bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(function () {
     bandit.getDecision(
       experimentId,
       defaultProductRecs = getProductRecs,
