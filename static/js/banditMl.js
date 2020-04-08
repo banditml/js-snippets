@@ -43,13 +43,6 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
 
   // bandit backend information
   this.banditApikey = apiKey;
-  // const banditHostUrl = "http://localhost:8000/api/";
-  const banditHostUrl = "https://www.16ounc.es/api/";
-  // const banditHostUrl = "https://www.banditml.com/api/";
-  this.banditDecisionEndpoint = banditHostUrl + "decision";
-  this.banditLogRewardEndpoint = `${banditHostUrl}reward`;
-  this.banditLogDecisionEndpoint = `${banditHostUrl}log_decision`;
-  this.banditValidationEndpoint = `${banditHostUrl}validate`;
   this.sessionIdKey = "BanditMLSessionId";
   this.lastActionTimeKey = "BanditMLLastActionTime";
   this.rewardTypeClick = "click";
@@ -58,11 +51,13 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
   let defaultConfig = {
     debugMode: false,
     sessionLengthHrs: 0.5,
-    // checks for reward types to auto log
-    // e.g. ["click"]
-    autoLogReward: []
+    banditHostUrl: "https://www.banditml.com/api/"
   };
   this.config = Object.assign(defaultConfig, config);
+  this.banditDecisionEndpoint = `${this.config.banditHostUrl}decision`;
+  this.banditLogRewardEndpoint = `${this.config.banditHostUrl}reward`;
+  this.banditLogDecisionEndpoint = `${this.config.banditHostUrl}log_decision`;
+  this.banditValidationEndpoint = `${this.config.banditHostUrl}validate`;
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -327,32 +322,6 @@ BanditAPI.prototype.clearContext = function(experimentId) {
   this.storage.removeItem(this.contextName(experimentId));
 };
 
-BanditAPI.prototype.checkForShortTermReward = function(context, experimentId) {
-  if (!this.config.autoLogReward) {
-    return;
-  }
-  const lastDecision = this.getLastDecision(experimentId);
-  this.config.autoLogReward.forEach(reward => {
-    if (reward === this.rewardTypeClick) {
-      const currentProductId = context.currentlyViewingProduct;
-      this.assert(currentProductId, "autoLogReward enabled for click, but currentlyViewingProduct not found in context.");
-      if (this.config.debugMode) {
-        console.log(`Automatically checking for a ${reward} reward`);
-      }
-      if (lastDecision && lastDecision.ids && lastDecision.ids.includes(currentProductId)) {
-        if (this.config.debugMode) {
-          console.log(`User previously saw the current product ${currentProductId} in the last set of recommendations. Auto logging reward.`);
-        }
-        this.logReward({[this.rewardTypeClick]: 1}, experimentId, currentProductId, lastDecision.id);
-      }
-    } else {
-      console.warn(`Unrecognized reward type: ${reward}`);
-    }
-  });
-  // avoid dupe and improper short term reward logging by clearing lastDecision
-  this.updateLastDecision(null, experimentId);
-};
-
 BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   const self = this;
   self.assert(
@@ -374,13 +343,6 @@ BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
     context = await context;
   }
   self.updateSessionId();
-  try {
-    self.checkForShortTermReward(context, experimentId);
-  } catch (e) {
-    if (self.debugMode) {
-      console.warn('Unable to check for short term reward.')
-    }
-  }
   if (self.config.debugMode) {
     console.log('Updated context.');
     console.log(context);
@@ -432,6 +394,10 @@ BanditAPI.prototype.setRecs = async function (
       }
     }
   }
+  if (self.config.debugMode) {
+    console.log("After filtering, the following recs will be shown:");
+    console.log(productRecIds);
+  }
   if (populateProductRecs) {
     self.assert(
       self.isFunction(populateProductRecs),
@@ -451,6 +417,7 @@ BanditAPI.prototype.setRecs = async function (
 
 BanditAPI.prototype.getDecision = async function (
   experimentId,
+  // defaultProductRecs now optional?
   defaultProductRecs = null,
   filterRecs = null,
   populateProductRecs = null,
@@ -467,6 +434,7 @@ BanditAPI.prototype.getDecision = async function (
   function setErrorRecs(e) {
     console.error("Error getting decision, setting your default recs instead.")
     console.error(e);
+    // TODO: deal with error case for user if defaultProductRecs is null?
     return self.setRecs(self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
   }
 
@@ -503,19 +471,26 @@ BanditAPI.prototype.getDecision = async function (
         console.log("Got a decision from Bandit.");
         console.log(loggedDecision);
       }
-      const originalIds = loggedDecision.decision.ids;
+      // TODO: productRecIds should be renamed to something more generic?
       let productRecIds;
-      if (defaultProductRecs) {
-        if (response.isControl) {
-          productRecIds = await self.getControlRecs(defaultProductRecs);
+      if (loggedDecision.type === "D") {
+        const originalIds = loggedDecision.decision.ids;
+        // TODO: validate this is the right behavior
+        if (defaultProductRecs) {
+          if (response.isControl) {
+            productRecIds = await self.getControlRecs(defaultProductRecs);
+          } else {
+            productRecIds = originalIds;
+          }
         } else {
           productRecIds = originalIds;
         }
+        productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
+        loggedDecision.decision.ids = productRecIds;
       } else {
-        productRecIds = originalIds;
+        productRecIds = loggedDecision.decision.ids;
+        await self.setRecs(productRecIds, filterRecs, populateProductRecs);
       }
-      productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
-      loggedDecision.decision.ids = productRecIds;
       if (shouldLogDecision) {
         if (self.config.debugMode) {
           console.log("Will log decision when user sees it");
@@ -552,7 +527,7 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
     decision: decision,
     experimentId: experimentId,
     mdpId: this.getSessionId(),
-    variation_id: decision.variation_id
+    variantId: decision.variantId
   }).then(response => {
     if (this.config.debugMode) {
       console.log('Successfully logged decision');
