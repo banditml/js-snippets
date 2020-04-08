@@ -45,13 +45,13 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
   this.banditApikey = apiKey;
   this.sessionIdKey = "BanditMLSessionId";
   this.lastActionTimeKey = "BanditMLLastActionTime";
-  this.rewardTypeClick = "click";
   this.recClassByExperimentId = recClassByExperimentId;
   this.decisionsLoggedById = {};
   let defaultConfig = {
     debugMode: false,
     sessionLengthHrs: 0.5,
-    banditHostUrl: "https://www.banditml.com/api/"
+    banditHostUrl: "https://www.banditml.com/api/",
+    getSessionId: null
   };
   this.config = Object.assign(defaultConfig, config);
   this.banditDecisionEndpoint = `${this.config.banditHostUrl}decision`;
@@ -127,6 +127,10 @@ BanditAPI.prototype.clearSession = function() {
 };
 
 BanditAPI.prototype.getSessionId = function() {
+  // If user has their own function for getSessionId, use it instead
+  if (this.config.getSessionId) {
+    return this.config.getSessionId();
+  }
   // Get session ID from local storage or create one if it doesn't exist for some reason
   return this.getItemFromStorage(this.sessionIdKey) || this.updateSessionId();
   // TODO: support case where client has their own session ID they track
