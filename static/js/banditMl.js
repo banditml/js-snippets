@@ -350,77 +350,76 @@ BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   return context;
 };
 
-BanditAPI.prototype.getControlRecs = async function (defaultProductRecs) {
+BanditAPI.prototype.getControlRecs = async function (defaultDecisionIds) {
   const self = this;
   self.assert(
-    Array.isArray(defaultProductRecs) || self.isFunction(defaultProductRecs),
-    "defaultProductRecs must be an array or function.");
-  let productRecIds;
-  // defaultProductRecs can be array of IDs
-  if (Array.isArray(defaultProductRecs)) {
-    productRecIds = defaultProductRecs;
+    Array.isArray(defaultDecisionIds) || self.isFunction(defaultDecisionIds),
+    "defaultDecisionIds must be an array or function.");
+  let decisionIds;
+  // defaultDecisionIds can be array of IDs
+  if (Array.isArray(defaultDecisionIds)) {
+    decisionIds = defaultDecisionIds;
   } else {
-    // defaultProductRecs could also be a function that returns IDs or an async function that returns promise of IDs
-    let result = defaultProductRecs();
+    // defaultDecisionIds could also be a function that returns IDs or an async function that returns promise of IDs
+    let result = defaultDecisionIds();
     if (result && result.then) {
       // if fn returns a promise, we await it then expect ids to be returned
-      productRecIds = await result;
+      decisionIds = await result;
     } else {
-      productRecIds = result;
+      decisionIds = result;
     }
   }
-  return productRecIds;
+  return decisionIds;
 };
 
 BanditAPI.prototype.setRecs = async function (
-  productRecIds = null,
+  decisionIds = null,
   filterRecs = null,
-  populateProductRecs = null
+  populateDecisions = null
 ) {
   const self = this;
-  if (productRecIds.then) {
-    productRecIds = await productRecIds;
+  if (decisionIds.then) {
+    decisionIds = await decisionIds;
   }
-  self.validateDecisionIds(productRecIds);
+  self.validateDecisionIds(decisionIds);
   if (filterRecs) {
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
     // filterRecs can be function that directly returns IDs or promise
-    let result = filterRecs(productRecIds);
+    let result = filterRecs(decisionIds);
     if (result) {
       if (result.then) {
-        productRecIds = await result;
+        decisionIds = await result;
       } else {
-        productRecIds = result;
+        decisionIds = result;
       }
     }
   }
   if (self.config.debugMode) {
     console.log("After filtering, the following recs will be shown:");
-    console.log(productRecIds);
+    console.log(decisionIds);
   }
-  if (populateProductRecs) {
+  if (populateDecisions) {
     self.assert(
-      self.isFunction(populateProductRecs),
-      "populateProductRecs must be a function."
+      self.isFunction(populateDecisions),
+      "populateDecisions must be a function."
     );
-    let result = populateProductRecs(productRecIds);
+    let result = populateDecisions(decisionIds);
     if (result) {
       if (result.then) {
-        productRecIds = await result;
+        decisionIds = await result;
       } else {
-        productRecIds = result;
+        decisionIds = result;
       }
     }
   }
-  return productRecIds;
+  return decisionIds;
 };
 
 BanditAPI.prototype.getDecision = async function (
   experimentId,
-  // defaultProductRecs now optional?
-  defaultProductRecs = null,
+  defaultDecisionIds = null,
   filterRecs = null,
-  populateProductRecs = null,
+  populateDecisions = null,
   shouldLogDecision = true
 ) {
   const self = this;
@@ -434,8 +433,8 @@ BanditAPI.prototype.getDecision = async function (
   function setErrorRecs(e) {
     console.error("Error getting decision, setting your default recs instead.")
     console.error(e);
-    // TODO: deal with error case for user if defaultProductRecs is null?
-    return self.setRecs(self.getControlRecs(defaultProductRecs), filterRecs, populateProductRecs);
+    // TODO: deal with error case for user if defaultDecisionIds is null?
+    return self.setRecs(self.getControlRecs(defaultDecisionIds), filterRecs, populateDecisions);
   }
 
   let ipPromise = self.asyncGetRequest(self.ipUrl,
@@ -471,25 +470,23 @@ BanditAPI.prototype.getDecision = async function (
         console.log("Got a decision from Bandit.");
         console.log(loggedDecision);
       }
-      // TODO: productRecIds should be renamed to something more generic?
-      let productRecIds;
+      let decisionIds;
       if (loggedDecision.type === "D") {
         const originalIds = loggedDecision.decision.ids;
-        // TODO: validate this is the right behavior
-        if (defaultProductRecs) {
+        if (defaultDecisionIds) {
           if (response.isControl) {
-            productRecIds = await self.getControlRecs(defaultProductRecs);
+            decisionIds = await self.getControlRecs(defaultDecisionIds);
           } else {
-            productRecIds = originalIds;
+            decisionIds = originalIds;
           }
         } else {
-          productRecIds = originalIds;
+          decisionIds = originalIds;
         }
-        productRecIds = await self.setRecs(productRecIds, filterRecs, populateProductRecs);
-        loggedDecision.decision.ids = productRecIds;
+        decisionIds = await self.setRecs(decisionIds, filterRecs, populateDecisions);
+        loggedDecision.decision.ids = decisionIds;
       } else {
-        productRecIds = loggedDecision.decision.ids;
-        await self.setRecs(productRecIds, filterRecs, populateProductRecs);
+        decisionIds = loggedDecision.decision.ids;
+        await self.setRecs(decisionIds, filterRecs, populateDecisions);
       }
       if (shouldLogDecision) {
         if (self.config.debugMode) {
@@ -498,6 +495,7 @@ BanditAPI.prototype.getDecision = async function (
         }
         self.addDecisionHandler(context, loggedDecision, experimentId);
       }
+      // TODO: the result of this promise ends up being undefined?
       return response;
     }).catch(e => {
       return setErrorRecs(e);
