@@ -108,9 +108,9 @@
   bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(async function () {
     bandit.getDecision(
       experimentId,
-      defaultProductRecs = null,
+      defaultDecisionIds = null,
       filterRecs = filterRecs,
-      populateProductRecs = modHtml
+      populateDecisions = modHtml
     );
   });
 
