@@ -474,10 +474,10 @@ BanditAPI.prototype.getDecision = async function (
       console.log(loggedDecision);
     }
     let decisionIds;
-    if (loggedDecision.type === "D") {
+    if (loggedDecision.decision.type === "D") {
       const originalIds = loggedDecision.decision.ids;
       if (defaultDecisionIds) {
-        if (response.isControl) {
+        if (response.decision.isControl) {
           decisionIds = await self.getControlRecs(defaultDecisionIds);
         } else {
           decisionIds = originalIds;
@@ -498,7 +498,6 @@ BanditAPI.prototype.getDecision = async function (
       }
       self.addDecisionHandler(context, loggedDecision, experimentId);
     }
-    // TODO: the result of this promise ends up being undefined?
     return response;
   }).catch(e => {
     return setErrorRecs(e);
