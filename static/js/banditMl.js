@@ -211,7 +211,7 @@ BanditAPI.prototype.contextValidationKey = function(experimentId) {
 };
 
 BanditAPI.prototype.getContext = function(experimentId) {
-  return this.getItemFromStorage(this.contextName(experimentId));
+  return this.getItemFromStorage(this.contextName(experimentId)) || {};
 };
 
 BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
@@ -437,69 +437,71 @@ BanditAPI.prototype.getDecision = async function (
     return self.setRecs(self.getControlRecs(defaultDecisionIds), filterRecs, populateDecisions);
   }
 
-  let ipPromise = self.asyncGetRequest(self.ipUrl,
-    params = {},
-    headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  );
-  ipPromise.then(async (response) => {
-    let context;
+  let context = self.getContext(experimentId);
+  if (!('ipAddress' in context)) {
+    let ipPromise = self.asyncGetRequest(self.ipUrl,
+      params = {},
+      headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    );
+    let ipResult = await ipPromise;
+    const ipAddress = ipResult.ip;
     try {
-      const ipAddress = await response.ip;
-      context = self.updateContext({ipAddress: ipAddress}, experimentId);
+      context.ipAddress = ipAddress;
+      context = self.updateContext(context, experimentId);
       if (context.then) {
         context = await context;
       }
     } catch (e) {
       return setErrorRecs(e);
     }
+  }
 
-    // call gradient-app and get a decision
-    let decisionPromise = self.asyncGetRequest(
-      url = self.banditDecisionEndpoint,
-      params = {context: context, experimentId: experimentId},
-      headers = {
-        "Authorization": `ApiKey ${self.banditApikey}`
-      }
-    );
-    return decisionPromise.then(async (response) => {
-      let loggedDecision = response;
-      if (self.config.debugMode) {
-        console.log("Got a decision from Bandit.");
-        console.log(loggedDecision);
-      }
-      let decisionIds;
-      if (loggedDecision.type === "D") {
-        const originalIds = loggedDecision.decision.ids;
-        if (defaultDecisionIds) {
-          if (response.isControl) {
-            decisionIds = await self.getControlRecs(defaultDecisionIds);
-          } else {
-            decisionIds = originalIds;
-          }
+  // call gradient-app and get a decision
+  let decisionPromise = self.asyncGetRequest(
+    url = self.banditDecisionEndpoint,
+    params = {context: context, experimentId: experimentId},
+    headers = {
+      "Authorization": `ApiKey ${self.banditApikey}`
+    }
+  );
+  return decisionPromise.then(async (response) => {
+    let loggedDecision = response;
+    if (self.config.debugMode) {
+      console.log("Got a decision from Bandit.");
+      console.log(loggedDecision);
+    }
+    let decisionIds;
+    if (loggedDecision.type === "D") {
+      const originalIds = loggedDecision.decision.ids;
+      if (defaultDecisionIds) {
+        if (response.isControl) {
+          decisionIds = await self.getControlRecs(defaultDecisionIds);
         } else {
           decisionIds = originalIds;
         }
-        decisionIds = await self.setRecs(decisionIds, filterRecs, populateDecisions);
-        loggedDecision.decision.ids = decisionIds;
       } else {
-        decisionIds = loggedDecision.decision.ids;
-        await self.setRecs(decisionIds, filterRecs, populateDecisions);
+        decisionIds = originalIds;
       }
-      if (shouldLogDecision) {
-        if (self.config.debugMode) {
-          console.log("Will log decision when user sees it");
-          console.log(loggedDecision);
-        }
-        self.addDecisionHandler(context, loggedDecision, experimentId);
+      decisionIds = await self.setRecs(decisionIds, filterRecs, populateDecisions);
+      loggedDecision.decision.ids = decisionIds;
+    } else {
+      decisionIds = loggedDecision.decision.ids;
+      await self.setRecs(decisionIds, filterRecs, populateDecisions);
+    }
+    if (shouldLogDecision) {
+      if (self.config.debugMode) {
+        console.log("Will log decision when user sees it");
+        console.log(loggedDecision);
       }
-      // TODO: the result of this promise ends up being undefined?
-      return response;
-    }).catch(e => {
-      return setErrorRecs(e);
-    });
+      self.addDecisionHandler(context, loggedDecision, experimentId);
+    }
+    // TODO: the result of this promise ends up being undefined?
+    return response;
+  }).catch(e => {
+    return setErrorRecs(e);
   });
 };
 
