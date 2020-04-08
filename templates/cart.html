@@ -79,6 +79,9 @@
     <h2> Bandit ML Product Recommendation:</h2>
     <h3>You should also buy: </h3><p id="recommendationDiv"></p>
   </div>
+  <div id="recsCategory" class="recsCategory">
+
+  </div>
 </div>
 <style>
   .recs {
@@ -92,30 +95,26 @@
 <script>
 	var context = bandit.getContext(experimentId);
   var decision = 4;
-  async function getProductRecs() {
-    {#return ["prod_Kvg9l6xado1bB7", "prod_NXELwjqnzl3A4p", "prod_0YnEoqpxpwe7P6"];#}
-    return ["c", "b"];
-  }
-
+	// categorical case
   function filterRecs(recs) {
-    return recs.slice(0, 3);
+    return recs[0];
   }
 
   async function modHtml(recs) {
-    document.getElementById("recommendationDiv").innerHTML = JSON.stringify(recs);
+    document.getElementById("recsCategory").innerHTML = JSON.stringify(recs);
     return recs;
   }
-  {#bandit.updateContext({currentlyViewingProduct: "prod_NXELwjqnzl3A4p"}, experimentId).then(function () {#}
-  bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(function () {
+
+  bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(async function () {
     bandit.getDecision(
       experimentId,
-      defaultProductRecs = getProductRecs,
+      defaultProductRecs = null,
       filterRecs = filterRecs,
       populateProductRecs = modHtml
     );
   });
-	document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 
+  document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
 	$.ajax({
 	  url: 'get_product?productId=' + decision,
 	  success: function(data) {
