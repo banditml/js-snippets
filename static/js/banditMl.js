@@ -114,7 +114,7 @@ BanditAPI.prototype.updateSessionId = function() {
   let lastActionTimeMs = this.getItemFromStorage(this.lastActionTimeKey);
   if (!sessionId || !lastActionTimeMs ||
       this.isTimeExpired(lastActionTimeMs, this.config.sessionLengthHrs)) {
-    let sessionId = this.uuidv4();
+    sessionId = this.uuidv4();
     this.setItemInStorage(this.sessionIdKey, sessionId);
     this.setItemInStorage(this.lastActionTimeKey, new Date().getTime());
   }
@@ -127,12 +127,21 @@ BanditAPI.prototype.clearSession = function() {
 };
 
 BanditAPI.prototype.getSessionId = function() {
-  // If user has their own function for getSessionId, use it instead
+  let sessionId;
+  let additionalMsg = '';
   if (this.config.getSessionId) {
-    return this.config.getSessionId();
+    // If user has their own function for getSessionId, use it instead
+    sessionId = this.config.getSessionId();
+    additionalMsg = "Looks like you are using your own getSessionId function. Double check this isn't returning null."
+  } else {
+    // Get session ID from local storage or create one if it doesn't exist
+    sessionId = this.getItemFromStorage(this.sessionIdKey) || this.updateSessionId();
   }
-  // Get session ID from local storage or create one if it doesn't exist for some reason
-  return this.getItemFromStorage(this.sessionIdKey) || this.updateSessionId();
+  this.assert(
+    sessionId && typeof sessionId === "string",
+    `sessionId needs to be non-null string, somehow it's ${sessionId} instead.` + additionalMsg
+  );
+  return sessionId;
 };
 
 BanditAPI.prototype.assert = function(condition, message) {
@@ -565,14 +574,12 @@ BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, 
     this.assert(decision && typeof decision === "string", `For immediate rewards, decision needs to be a single string ID. Got ${decision} instead.`);
     this.assert(decisionId && typeof decisionId === "string", `For immediate rewards, decisionId needs to be a single string ID. Got ${decisionId} instead.`);
   }
-  const mdpId = this.getSessionId();
-  this.assert(mdpId && typeof mdpId === "string", `mdpId needs to be non-null string (given by session ID automatically), somehow it's ${mdpId} instead.`);
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     decision: decision,
     metrics: reward,
     experimentId: experimentId,
-    mdpId: mdpId
+    mdpId: this.getSessionId()
   }).then(response => {
     if (this.config.debugMode) {
       console.log("Successfully logged reward.");
