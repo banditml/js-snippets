@@ -552,13 +552,10 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
 };
 
 BanditAPI.prototype.isDelayedReward = function(reward, experimentId) {
-  const lastDecision = this.getLastDecision(experimentId);
-  if (lastDecision == null) {
-    // last decision wasn't populated, so it shouldn't be possible reward is delayed
-    return false;
-  }
+  let contextValidation = this.getItemFromStorage(this.contextValidationKey(experimentId));
+  this.assert(contextValidation, "contextValidation is null, possibly from calling logReward without updating context.")
   // if every key is in the possible choices (IDs), we categorize as delayed reward
-  return Object.keys(reward).every(key => lastDecision.ids.includes(key));
+  return Object.keys(reward).every(key => contextValidation.choices.possible_values.includes(key));
 };
 
 BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
