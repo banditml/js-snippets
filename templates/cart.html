@@ -97,11 +97,14 @@
   var decision = 4;
 	// categorical case
   function filterRecs(recs) {
-    return recs[0];
+    return recs.slice(0, 3);
   }
 
   async function modHtml(recs) {
-    document.getElementById("recsCategory").innerHTML = JSON.stringify(recs);
+    recs.forEach(rec => {
+      $("#recsCategory").append(`<p id="${rec}" class="banditRec" href="#">${rec}</p>`);
+    });
+    {#document.getElementById("recsCategory").innerHTML = JSON.stringify(recs);#}
     return recs;
   }
 
@@ -111,7 +114,16 @@
       defaultDecisionIds = null,
       filterRecs = filterRecs,
       populateDecisions = modHtml
-    );
+    ).then(function(response) {
+      $(document).on('click', '.banditRec', function (e) {
+        bandit.logReward(
+          reward={click:1},
+          experimentId=experimentId,
+          response=$(this).attr('id'),
+          decisionId=response.decision.id
+        )
+      });
+    });
   });
 
   document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
