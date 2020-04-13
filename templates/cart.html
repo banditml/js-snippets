@@ -97,14 +97,17 @@
   var decision = 4;
 	// categorical case
   function filterRecs(recs) {
-    return recs.slice(0, 3);
+    return recs[0];
   }
 
   async function modHtml(recs) {
-    recs.forEach(rec => {
-      $("#recsCategory").append(`<p id="${rec}" class="banditRec" href="#">${rec}</p>`);
-    });
-    {#document.getElementById("recsCategory").innerHTML = JSON.stringify(recs);#}
+    if (Array.isArray(recs)) {
+      recs.forEach(rec => {
+        $("#recsCategory").append(`<a id="${rec}" class="banditRec" href="#">${rec}</a>`);
+      });
+    } else {
+      $("#recsCategory").append(`<a id="${recs}" class="banditRec" href="#">${recs}</a>`);
+    }
     return recs;
   }
 
@@ -119,7 +122,7 @@
         bandit.logReward(
           reward={click:1},
           experimentId=experimentId,
-          response=$(this).attr('id'),
+          decision=$(this).attr('id'),
           decisionId=response.decision.id
         )
       });

@@ -133,7 +133,6 @@ BanditAPI.prototype.getSessionId = function() {
   }
   // Get session ID from local storage or create one if it doesn't exist for some reason
   return this.getItemFromStorage(this.sessionIdKey) || this.updateSessionId();
-  // TODO: support case where client has their own session ID they track
 };
 
 BanditAPI.prototype.assert = function(condition, message) {
@@ -566,12 +565,14 @@ BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, 
     this.assert(decision && typeof decision === "string", `For immediate rewards, decision needs to be a single string ID. Got ${decision} instead.`);
     this.assert(decisionId && typeof decisionId === "string", `For immediate rewards, decisionId needs to be a single string ID. Got ${decisionId} instead.`);
   }
+  const mdpId = this.getSessionId();
+  this.assert(mdpId && typeof mdpId === "string", `mdpId needs to be non-null string (given by session ID automatically), somehow it's ${mdpId} instead.`);
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     decision: decision,
     metrics: reward,
     experimentId: experimentId,
-    mdpId: this.getSessionId()
+    mdpId: mdpId
   }).then(response => {
     if (this.config.debugMode) {
       console.log("Successfully logged reward.");
