@@ -96,8 +96,13 @@
 	var context = bandit.getContext(experimentId);
   var decision = 4;
 	// categorical case
+  {#function filterRecs(recs) {#}
+  {#  return recs[0];#}
+  {#}#}
+
+  // pset case
   function filterRecs(recs) {
-    return recs[0];
+    return recs.slice(0, 2);
   }
 
   async function modHtml(recs) {

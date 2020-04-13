@@ -481,6 +481,10 @@ BanditAPI.prototype.getDecision = async function (
   );
   return decisionPromise.then(async (response) => {
     let loggedDecision = response;
+    let scoresById = loggedDecision.decision.ids.reduce((result, item, index) => {
+      result[item] = loggedDecision.decision.scores[index];
+      return result;
+    }, {});
     if (self.config.debugMode) {
       console.log("Got a decision from Bandit.");
       console.log(loggedDecision);
@@ -503,6 +507,9 @@ BanditAPI.prototype.getDecision = async function (
       decisionIds = loggedDecision.decision.ids;
       await self.setRecs(decisionIds, filterRecs, populateDecisions);
     }
+    loggedDecision.decision.scores = loggedDecision.decision.ids.map(id => {
+      return scoresById[id];
+    });
     if (shouldLogDecision) {
       if (self.config.debugMode) {
         console.log("Will log decision when user sees it");
