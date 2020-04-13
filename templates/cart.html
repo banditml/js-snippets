@@ -101,7 +101,13 @@
   }
 
   async function modHtml(recs) {
-    document.getElementById("recsCategory").innerHTML = JSON.stringify(recs);
+    if (Array.isArray(recs)) {
+      recs.forEach(rec => {
+        $("#recsCategory").append(`<a id="${rec}" class="banditRec" href="#">${rec}</a>`);
+      });
+    } else {
+      $("#recsCategory").append(`<a id="${recs}" class="banditRec" href="#">${recs}</a>`);
+    }
     return recs;
   }
 
@@ -111,7 +117,16 @@
       defaultDecisionIds = null,
       filterRecs = filterRecs,
       populateDecisions = modHtml
-    );
+    ).then(function(response) {
+      $(document).on('click', '.banditRec', function (e) {
+        bandit.logReward(
+          reward={click:1},
+          experimentId=experimentId,
+          decision=$(this).attr('id'),
+          decisionId=response.decision.id
+        )
+      });
+    });
   });
 
   document.getElementById("contextDiv").innerHTML = JSON.stringify(context);
