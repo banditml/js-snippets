@@ -1,6 +1,6 @@
 // 16ounc.es
-// let experimentId = "0698873e-b157-4fcb-bac5-5c6e804ee4ba";
-// let bandit = new BanditAPI("b3496e1b-228f-33fd-9887-883e8f15d7e1", {[experimentId]: "recs"}, debugMode = true);
+// let experimentId = "01c14c21-b66a-408b-89ba-7d888f0c35de";
+// let bandit = new banditml.BanditAPI("a48853ba-6c5a-3202-8711-4ce878833cb3", {[experimentId]: "recs"}, {debugMode: true, banditHostUrl: "https://www.16ounc.es/api/"});
 // local
 // product set case
 let experimentId = "18c08829-e49e-421f-a13b-77e7d6d0221b";
@@ -9,4 +9,4 @@ let experimentId = "18c08829-e49e-421f-a13b-77e7d6d0221b";
 function getSessionIdCustom () {
   return "1235"
 }
-let bandit = new BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {debugMode: true, banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});
+let bandit = new banditml.BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {debugMode: true, banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});

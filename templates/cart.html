@@ -62,7 +62,7 @@
 		<div id="total">
 			<span id="subtotal">Subtotal</span> : Rs {{totalPrice}}
 			<script>
-        bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);
+        {#bandit.updateContext({productsInCart: ["b", "a"]}, experimentId);#}
         {#bandit.updateContext({totalCartValue: {{totalPrice}}}, experimentId);#}
         {#bandit.updateContext({currentlyViewingProduct: "prod_Kvg9l6xBbo1bB7"}, experimentId);#}
       </script>
@@ -100,6 +100,10 @@
   {#  return recs[0];#}
   {#}#}
 
+  function defaultProductRecs() {
+    return ['prod_kpnNwAKOX5mXB3', 'prod_ypbroEnJ158n4e', 'prod_kpnNwAbX9omXB3'];
+  }
+
   // pset case
   function filterRecs(recs) {
     return recs.slice(0, 2);
@@ -116,10 +120,10 @@
     return recs;
   }
 
-  bandit.updateContext({currentlyViewingProduct: "a"}, experimentId).then(async function () {
+  bandit.updateContext({currentlyViewingProduct: "prod_NXELwjqnzl3A4p"}, experimentId).then(async function () {
     bandit.getDecision(
       experimentId,
-      defaultDecisionIds = null,
+      defaultDecisionIds = defaultProductRecs,
       filterRecs = filterRecs,
       populateDecisions = modHtml
     ).then(function(response) {

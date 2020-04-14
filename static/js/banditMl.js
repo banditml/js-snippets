@@ -38,7 +38,8 @@
 // _________________________________________██_______________
 
 
-function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
+window.banditml = window.banditml || {};
+banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {}) {
   this.storage = window.localStorage;
 
   // bandit backend information
@@ -61,9 +62,10 @@ function BanditAPI (apiKey, recClassByExperimentId = {}, config = {}) {
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
+
 }
 
-BanditAPI.prototype.addDecisionHandler = function (context, decision, experimentId) {
+banditml.BanditAPI.prototype.addDecisionHandler = function (context, decision, experimentId) {
   const self = this;
   const recClass = self.recClassByExperimentId[experimentId];
   // TODO: handle multiple rec elements?
@@ -83,30 +85,30 @@ BanditAPI.prototype.addDecisionHandler = function (context, decision, experiment
   }
 };
 
-BanditAPI.prototype.lastDecisionKey = function (experimentId) {
+banditml.BanditAPI.prototype.lastDecisionKey = function (experimentId) {
   return `BanditMLLastDecision-${experimentId}`;
 };
 
-BanditAPI.prototype.isTimeExpired = function (timeMs, numHrs) {
+banditml.BanditAPI.prototype.isTimeExpired = function (timeMs, numHrs) {
   const msInHr = 3600000;
   return (new Date().getTime() - timeMs) / msInHr > numHrs;
 };
 
-BanditAPI.prototype.uuidv4 = function() {
+banditml.BanditAPI.prototype.uuidv4 = function() {
   return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
     (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
   );
 };
 
-BanditAPI.prototype.getLastDecision = function (experimentId) {
+banditml.BanditAPI.prototype.getLastDecision = function (experimentId) {
   return this.getItemFromStorage(this.lastDecisionKey(experimentId));
 };
 
-BanditAPI.prototype.updateLastDecision = function(decision, experimentId) {
+banditml.BanditAPI.prototype.updateLastDecision = function(decision, experimentId) {
   this.setItemInStorage(this.lastDecisionKey(experimentId), decision);
 };
 
-BanditAPI.prototype.updateSessionId = function() {
+banditml.BanditAPI.prototype.updateSessionId = function() {
   // TODO: support case where client has their own session ID they track
   // Create new session ID tracked in local storage if it doesn't exist
   // If session ID already exists, create a new one if last tracked action was more than hour ago
@@ -121,12 +123,12 @@ BanditAPI.prototype.updateSessionId = function() {
   return sessionId;
 };
 
-BanditAPI.prototype.clearSession = function() {
+banditml.BanditAPI.prototype.clearSession = function() {
   this.storage.removeItem(this.sessionIdKey);
   this.storage.removeItem(this.lastActionTimeKey);
 };
 
-BanditAPI.prototype.getSessionId = function() {
+banditml.BanditAPI.prototype.getSessionId = function() {
   let sessionId;
   let additionalMsg = '';
   if (this.config.getSessionId) {
@@ -144,7 +146,7 @@ BanditAPI.prototype.getSessionId = function() {
   return sessionId;
 };
 
-BanditAPI.prototype.assert = function(condition, message) {
+banditml.BanditAPI.prototype.assert = function(condition, message) {
   if (!condition) {
     message = message || "Assertion failed.";
     message += " Contact support@banditml.com for assistance.";
@@ -155,7 +157,7 @@ BanditAPI.prototype.assert = function(condition, message) {
   }
 };
 
-BanditAPI.prototype.isFunction = function(functionToCheck) {
+banditml.BanditAPI.prototype.isFunction = function(functionToCheck) {
   if (!functionToCheck) {
     return false;
   }
@@ -163,7 +165,7 @@ BanditAPI.prototype.isFunction = function(functionToCheck) {
   return functionStr === '[object Function]' || functionStr === '[object AsyncFunction]';
 };
 
-BanditAPI.prototype.asyncGetRequest = async function(
+banditml.BanditAPI.prototype.asyncGetRequest = async function(
   url,
   params = {},
   headers = {}
@@ -193,7 +195,7 @@ BanditAPI.prototype.asyncGetRequest = async function(
   return await response.json();
 };
 
-BanditAPI.prototype.asyncPostRequest = async function postData(
+banditml.BanditAPI.prototype.asyncPostRequest = async function postData(
   url = '',
   headers = {},
   data = {}
@@ -210,23 +212,23 @@ BanditAPI.prototype.asyncPostRequest = async function postData(
   return await response.json(); // parses JSON response into native JavaScript objects
 };
 
-BanditAPI.prototype.getItemFromStorage = function (storageKey) {
+banditml.BanditAPI.prototype.getItemFromStorage = function (storageKey) {
   return JSON.parse(this.storage.getItem(storageKey));
 };
 
-BanditAPI.prototype.contextName = function(experimentId) {
+banditml.BanditAPI.prototype.contextName = function(experimentId) {
   return `banditMLContext-${experimentId}`
 };
 
-BanditAPI.prototype.contextValidationKey = function(experimentId) {
+banditml.BanditAPI.prototype.contextValidationKey = function(experimentId) {
   return `banditMLContextValidation-${experimentId}`;
 };
 
-BanditAPI.prototype.getContext = function(experimentId) {
+banditml.BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId)) || {};
 };
 
-BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
+banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
   const self = this;
   let filteredFeatures = {};
   for (const featureName in context) {
@@ -287,7 +289,7 @@ BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, cont
   return filteredFeatures;
 };
 
-BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
+banditml.BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
   const self = this;
   self.assert(
     typeof context === 'object' && context !== null,
@@ -312,11 +314,11 @@ BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
   return self.validateAndFilterFeaturesInContext(context, contextValidation);
 };
 
-BanditAPI.prototype.setItemInStorage = function(key, obj) {
+banditml.BanditAPI.prototype.setItemInStorage = function(key, obj) {
   this.storage.setItem(key, JSON.stringify(obj));
 };
 
-BanditAPI.prototype.setContext = async function(obj, experimentId) {
+banditml.BanditAPI.prototype.setContext = async function(obj, experimentId) {
   try {
     let context = this.validateAndFilterContext(obj, experimentId);
     if (context.then) {
@@ -330,11 +332,11 @@ BanditAPI.prototype.setContext = async function(obj, experimentId) {
   }
 };
 
-BanditAPI.prototype.clearContext = function(experimentId) {
+banditml.BanditAPI.prototype.clearContext = function(experimentId) {
   this.storage.removeItem(this.contextName(experimentId));
 };
 
-BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
+banditml.BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   const self = this;
   self.assert(
     typeof newContext === 'object' && newContext !== null,
@@ -362,7 +364,7 @@ BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
   return context;
 };
 
-BanditAPI.prototype.getControlRecs = async function (defaultDecisionIds) {
+banditml.BanditAPI.prototype.getControlRecs = async function (defaultDecisionIds) {
   const self = this;
   self.assert(
     Array.isArray(defaultDecisionIds) || self.isFunction(defaultDecisionIds),
@@ -384,7 +386,7 @@ BanditAPI.prototype.getControlRecs = async function (defaultDecisionIds) {
   return decisionIds;
 };
 
-BanditAPI.prototype.setRecs = async function (
+banditml.BanditAPI.prototype.setRecs = async function (
   decisionIds = null,
   filterRecs = null,
   populateDecisions = null
@@ -427,7 +429,7 @@ BanditAPI.prototype.setRecs = async function (
   return decisionIds;
 };
 
-BanditAPI.prototype.getDecision = async function (
+banditml.BanditAPI.prototype.getDecision = async function (
   experimentId,
   defaultDecisionIds = null,
   filterRecs = null,
@@ -523,7 +525,7 @@ BanditAPI.prototype.getDecision = async function (
   });
 };
 
-BanditAPI.prototype.validateDecisionIds = function(decisionIds) {
+banditml.BanditAPI.prototype.validateDecisionIds = function(decisionIds) {
   const decisionIdsType = typeof decisionIds;
   this.assert(
     Array.isArray(decisionIds) ||
@@ -533,7 +535,7 @@ BanditAPI.prototype.validateDecisionIds = function(decisionIds) {
   );
 };
 
-BanditAPI.prototype.logDecision = function(context, decisionResponse, experimentId) {
+banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, experimentId) {
   const decision = decisionResponse.decision;
   this.validateDecisionIds(decision.ids);
   const headers = {
@@ -558,14 +560,14 @@ BanditAPI.prototype.logDecision = function(context, decisionResponse, experiment
   });
 };
 
-BanditAPI.prototype.isDelayedReward = function(reward, experimentId) {
+banditml.BanditAPI.prototype.isDelayedReward = function(reward, experimentId) {
   let contextValidation = this.getItemFromStorage(this.contextValidationKey(experimentId));
   this.assert(contextValidation, "contextValidation is null, possibly from calling logReward without updating context.")
   // if every key is in the possible choices (IDs), we categorize as delayed reward
   return Object.keys(reward).every(key => contextValidation.choices.possible_values.includes(key));
 };
 
-BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
+banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
@@ -598,3 +600,6 @@ BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, 
     console.error(e);
   })
 };
+
+// backwards compatibility
+window.BanditAPI = window.banditml.BanditAPI;
