@@ -62,8 +62,7 @@ banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {})
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
-
-}
+};
 
 banditml.BanditAPI.prototype.addDecisionHandler = function (context, decision, experimentId) {
   const self = this;
@@ -453,16 +452,17 @@ banditml.BanditAPI.prototype.getDecision = async function (
 
   let context = self.getContext(experimentId);
   if (!('ipAddress' in context)) {
-    let ipPromise = self.asyncGetRequest(self.ipUrl,
-      params = {},
-      headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    );
-    let ipResult = await ipPromise;
-    const ipAddress = ipResult.ip;
     try {
+      let ipPromise = self.asyncGetRequest(
+        self.ipUrl,
+        params = {},
+        headers = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      );
+      let ipResult = await ipPromise;
+      const ipAddress = ipResult.ip;
       context.ipAddress = ipAddress;
       context = self.updateContext(context, experimentId);
       if (context.then) {
