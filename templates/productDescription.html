@@ -4,6 +4,85 @@
 <title>Product Description</title>
 <link rel="stylesheet" href={{url_for('static', filename='css/productDescription.css')}} />
 <link rel="stylesheet" href={{ url_for('static', filename='css/topStyle.css')}} />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!-- <script type="text/javascript" src="https://gradient-app-bucket-public-staging.s3.amazonaws.com/snippets/banditMl.min.js"></script> -->
+<script src={{ url_for('static', filename='js/banditMl.js') }}></script>
+
+
+<script>
+	let banditExperimentId = "2452b52a-8bda-4fb5-b0cd-832e0683d601";
+	let bandit = new  window.BanditAPI(
+		apiKey = "b3496e1b-228f-33fd-9887-883e8f15d7e1",
+		recClassByExperimentId = {[banditExperimentId]: "product-recs"},
+		config = {debugMode: true, banditHostUrl: "https://www.16ounc.es/api/"}
+	);
+
+	function defaultDecisionIds() {
+		let result = null
+		$.ajax({
+			url: '/get_recs',
+			data: {
+	  		productId: {{data[0]}},
+			},
+			async: false,
+			success: function (recs) {
+				result = recs.products
+			}
+		});
+		return result;
+	};
+
+	function filterRecs(recs) {
+		return recs.slice(0, 5);
+	};
+
+	function populateDecisions(products) {
+		products.forEach((productName) => {
+			$(".product-recs").append(`<div class="productRec" id=${productName}></div>`);
+			$(`#${productName}`).html(productName);
+		});
+ 	};
+
+	// old recommendation logic
+	// $.when(defaultDecisionIds()).then(function(recs) {
+	//   filteredRecs = filterRecs(recs);
+	// 	populateDecisions(filteredRecs);
+	// });
+
+	// Bandit ML recommendation logic
+	bandit.updateContext({
+		currentlyViewingProduct: "{{cleanedName}}",
+		trafficSource: "google",
+		totalCartValue: null,
+	},banditExperimentId).then(function () {
+		bandit.getDecision(
+			banditExperimentId,
+			defaultDecisionIds = defaultDecisionIds,
+			filterRecs = filterRecs,
+			populateDecisions = populateDecisions
+		).then(response => {
+			$('.productRec').click(function () {
+			  bandit.logReward(
+				  reward = {click: 1},
+				  experimentId = banditExperimentId,
+				  decision = $(this).attr('id'),
+				  decisionId = response.decision.id);
+			});
+		});
+	});
+
+	$(document).ready(function(){
+		$(".purchaseButton").click(function() {
+	  	bandit.logReward({
+				"Computer-1": {"purchase": 39.99},
+				"Mens-Tshirt-2": {"purchase": 19.99}
+			}, banditExperimentId);
+		});
+	});
+
+
+</script>
+
 </head>
 <body>
 <div id="title">
@@ -64,7 +143,21 @@
 	<div id="addToCart">
 		<a href="/addToCart?productId={{request.args.get('productId')}}">Add to Cart</a>
 	</div>
+
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+
+	<h3>Recommendations</h3>
+	<div class="product-recs"></div>
+	<br><br><br><br><br><br><br><br>
+
+	<button class="purchaseButton">Log long-term reward</button>
+
 </div>
 </body>
 </html>
-
