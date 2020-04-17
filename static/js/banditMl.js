@@ -243,7 +243,9 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
       const possibleValues = featureSpec.possible_values;
       const featureType = featureSpec.type;
       try {
-        if (featureType === "N") {
+        if (value == null) {
+          console.warn(`Not including ${featureName} in context due to null value.`);
+        } else if (featureType === "N") {
           const valueType = typeof value;
           self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
         } else if (featureType === "C") {

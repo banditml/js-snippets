@@ -289,6 +289,7 @@ def productDescription():
         loggedIn=loggedIn,
         firstName=firstName,
         noOfItems=noOfItems,
+        cleanedName=productData[1].replace(" ", "-").replace("'", ""),
     )
 
 
@@ -372,6 +373,24 @@ def checkout():
         firstName=firstName,
         noOfItems=noOfItems,
     )
+
+
+@app.route("/get_recs", methods=["GET"])
+def get_recs():
+    product_id = request.args.get("productId")
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""SELECT
+                products.name
+            FROM products
+            order by 1
+            limit 50
+            """
+        )
+        products = cur.fetchall()
+        products = [p[0].replace(" ", "-").replace("'", "") for p in products]
+    return jsonify({"products": products})
 
 
 @app.route("/get_product", methods=["GET"])
