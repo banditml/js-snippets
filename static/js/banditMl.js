@@ -558,26 +558,12 @@ banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, e
   });
 };
 
-banditml.BanditAPI.prototype.isDelayedReward = function(reward, experimentId) {
-  let contextValidation = this.getItemFromStorage(this.contextValidationKey(experimentId));
-  this.assert(contextValidation, "contextValidation is null, possibly from calling logReward without updating context.")
-  // if every key is in the possible choices (IDs), we categorize as delayed reward
-  return Object.keys(reward).every(key => contextValidation.choices.possible_values.includes(key));
-};
-
 banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
     reward && typeof reward === "object", "Reward needs to be a non-empty object.");
-  if (this.isDelayedReward(reward, experimentId)) {
-    this.assert(decision === null, `decision needs to be null for delayed rewards.`);
-    this.assert(decisionId === null, `decisionId needs to be null for delayed rewards.`);
-  } else {
-    this.assert(decision && typeof decision === "string", `For immediate rewards, decision needs to be a single string ID. Got ${decision} instead.`);
-    this.assert(decisionId && typeof decisionId === "string", `For immediate rewards, decisionId needs to be a single string ID. Got ${decisionId} instead.`);
-  }
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     decision: decision,
