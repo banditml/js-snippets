@@ -257,10 +257,6 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
             Array.isArray(possibleValues),
             `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
           );
-          self.assert(
-            possibleValues.includes(context[featureName]),
-            `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
-          );
         } else if (featureType === "P") {
           self.assert(
             Array.isArray(possibleValues),
@@ -270,17 +266,6 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
             typeof value === "string" || Array.isArray(value),
             `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
           );
-          if (Array.isArray(value)) {
-            self.assert(
-              value.every(val => possibleValues.includes(val)),
-              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-            );
-          } else {
-            self.assert(
-              possibleValues.includes(value),
-              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-            );
-          }
         }
         filteredFeatures[featureName] = value;
       } catch (e) {
