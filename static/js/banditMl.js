@@ -231,6 +231,16 @@ banditml.BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId)) || {};
 };
 
+banditml.BanditAPI.prototype.isValidArray = function(arr, arrValueType) {
+  if (!Array.isArray(arr)) {
+    return false;
+  }
+  if (!arrValueType) {
+    return arr.every(v => { return typeof v === arrValueType; });
+  }
+  return true;
+};
+
 banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
   const self = this;
   let filteredFeatures = {};
@@ -258,7 +268,7 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
           );
         } else if (featureType === "P") {
           self.assert(
-            typeof value === "string" || Array.isArray(value),
+            typeof value === "string" || self.isValidArray(value, "string"),
             `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
           );
         }
