@@ -244,7 +244,6 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
     if (featureExists) {
       const value = context[featureName];
       const featureSpec = contextValidation[featureName];
-      const possibleValues = featureSpec.possible_values;
       const featureType = featureSpec.type;
       try {
         if (value == null) {
@@ -254,14 +253,10 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
           self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
         } else if (featureType === "C") {
           self.assert(
-            Array.isArray(possibleValues),
-            `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
+            typeof value === "string",
+            `Feature ${featureName} is a categorical that expects a string, but ${value} is not a string.`
           );
         } else if (featureType === "P") {
-          self.assert(
-            Array.isArray(possibleValues),
-            `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
-          );
           self.assert(
             typeof value === "string" || Array.isArray(value),
             `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
