@@ -231,6 +231,16 @@ banditml.BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId)) || {};
 };
 
+banditml.BanditAPI.prototype.isValidArray = function(arr, arrValueType) {
+  if (!Array.isArray(arr)) {
+    return false;
+  }
+  if (!arrValueType) {
+    return arr.every(v => { return typeof v === arrValueType; });
+  }
+  return true;
+};
+
 banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
   const self = this;
   let filteredFeatures = {};
@@ -244,7 +254,6 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
     if (featureExists) {
       const value = context[featureName];
       const featureSpec = contextValidation[featureName];
-      const possibleValues = featureSpec.possible_values;
       const featureType = featureSpec.type;
       try {
         if (value == null) {
@@ -254,33 +263,14 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
           self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
         } else if (featureType === "C") {
           self.assert(
-            Array.isArray(possibleValues),
-            `Feature ${featureName} is categorical, but its possible values is not an array. Update the model appropriately in Bandit ML.`
-          );
-          self.assert(
-            possibleValues.includes(context[featureName]),
-            `Value ${value} is not recognized among possible values for feature ${featureName}. Please update the possible values in Bandit ML.`
+            typeof value === "string",
+            `Feature ${featureName} is a categorical that expects a string, but ${value} is not a string.`
           );
         } else if (featureType === "P") {
           self.assert(
-            Array.isArray(possibleValues),
-            `Feature ${featureName} is a product set, but its possible values is not an array. Update the model appropriately in Bandit ML.`
-          );
-          self.assert(
-            typeof value === "string" || Array.isArray(value),
+            typeof value === "string" || self.isValidArray(value, "string"),
             `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
           );
-          if (Array.isArray(value)) {
-            self.assert(
-              value.every(val => possibleValues.includes(val)),
-              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-            );
-          } else {
-            self.assert(
-              possibleValues.includes(value),
-              `${value} is not included in ${featureName}'s possible values ${possibleValues}.`
-            );
-          }
         }
         filteredFeatures[featureName] = value;
       } catch (e) {
@@ -578,26 +568,12 @@ banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, e
   });
 };
 
-banditml.BanditAPI.prototype.isDelayedReward = function(reward, experimentId) {
-  let contextValidation = this.getItemFromStorage(this.contextValidationKey(experimentId));
-  this.assert(contextValidation, "contextValidation is null, possibly from calling logReward without updating context.")
-  // if every key is in the possible choices (IDs), we categorize as delayed reward
-  return Object.keys(reward).every(key => contextValidation.choices.possible_values.includes(key));
-};
-
 banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
   this.assert(
     reward && typeof reward === "object", "Reward needs to be a non-empty object.");
-  if (this.isDelayedReward(reward, experimentId)) {
-    this.assert(decision === null, `decision needs to be null for delayed rewards.`);
-    this.assert(decisionId === null, `decisionId needs to be null for delayed rewards.`);
-  } else {
-    this.assert(decision && typeof decision === "string", `For immediate rewards, decision needs to be a single string ID. Got ${decision} instead.`);
-    this.assert(decisionId && typeof decisionId === "string", `For immediate rewards, decisionId needs to be a single string ID. Got ${decisionId} instead.`);
-  }
   this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
     decisionId: decisionId,
     decision: decision,
