@@ -223,6 +223,10 @@ banditml.BanditAPI.prototype.contextValidationKey = function(experimentId) {
   return `banditMLContextValidation-${experimentId}`;
 };
 
+banditml.BanditAPI.prototype.serverSideCacheKey = function(experimentId) {
+  return `banditMLServerSideCache-${experimentId}`;
+};
+
 banditml.BanditAPI.prototype.getContext = function(experimentId) {
   return this.getItemFromStorage(this.contextName(experimentId)) || {};
 };
@@ -475,16 +479,28 @@ banditml.BanditAPI.prototype.getDecision = async function (
     }
   }
 
+  // check for cache object locally which holds auto-context
+  let cache = self.getItemFromStorage(self.serverSideCacheKey(experimentId));
+
   // call gradient-app and get a decision
   let decisionPromise = self.asyncGetRequest(
     url = self.banditDecisionEndpoint,
-    params = {context: context, experimentId: experimentId},
+    params = {context: context, experimentId: experimentId, cache: cache},
     headers = {
       "Authorization": `ApiKey ${self.banditApikey}`
     }
   );
   return decisionPromise.then(async (response) => {
     let loggedDecision = response;
+    // update cache object locally which holds auto-context
+    let cache = loggedDecision.decision.cache;
+    if (cache != null) {
+      self.setItemInStorage(self.serverSideCacheKey(experimentId), cache);
+    } else {
+      if (self.config.debugMode) {
+        console.log("Null cache passed back from Bandit ML server.");
+      }
+    };
     let scoresById = loggedDecision.decision.ids.reduce((result, item, index) => {
       result[item] = loggedDecision.decision.scores[index];
       return result;
