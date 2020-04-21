@@ -59,6 +59,7 @@ banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {})
   this.banditLogRewardEndpoint = `${this.config.banditHostUrl}reward`;
   this.banditLogDecisionEndpoint = `${this.config.banditHostUrl}log_decision`;
   this.banditValidationEndpoint = `${this.config.banditHostUrl}validate`;
+  this.banditLogErrorEndpoint = `${this.config.banditHostUrl}log_error`;
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
@@ -145,10 +146,38 @@ banditml.BanditAPI.prototype.getSessionId = function() {
   return sessionId;
 };
 
-banditml.BanditAPI.prototype.assert = function(condition, message) {
+banditml.BanditAPI.prototype.logError = function(message, errData, e) {
+  const headers = {
+    "Authorization": `ApiKey ${this.banditApikey}`
+  };
+  if (this.config.debugMode) {
+    console.error(message);
+    if (e) {
+      console.error(e);
+    }
+  } else {
+    errData = errData || {};
+    if (e) {
+      Object.assign(errData, {
+        e: e.toString(),
+        errName: e.name,
+        errMessage: e.message,
+      });
+    }
+    return this.asyncPostRequest(this.banditLogErrorEndpoint, headers, {
+      message: message,
+      data: errData
+    });
+  }
+};
+
+banditml.BanditAPI.prototype.assert = function(condition, message, errData) {
   if (!condition) {
     message = message || "Assertion failed.";
-    message += " Contact support@banditml.com for assistance.";
+    if (this.config.debugMode) {
+      message += " Contact support@banditml.com for assistance.";
+    }
+    this.logError(message, errData);
     if (typeof Error !== "undefined") {
       throw new Error(message);
     }
@@ -243,6 +272,10 @@ banditml.BanditAPI.prototype.isValidArray = function(arr, arrValueType) {
 
 banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (context, contextValidation) {
   const self = this;
+  let errData = {
+    context: context,
+    contextValidation: contextValidation
+  };
   let filteredFeatures = {};
   for (const featureName in context) {
     if (featureName === "ipAddress") {
@@ -255,27 +288,40 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
       const value = context[featureName];
       const featureSpec = contextValidation[featureName];
       const featureType = featureSpec.type;
+      Object.assign(errData, {
+        value: value,
+        featureSpec: featureSpec,
+        featureType: featureType
+      });
       try {
         if (value == null) {
-          console.warn(`Not including ${featureName} in context due to null value.`);
+          if (self.config.debugMode) {
+            console.warn(`Not including ${featureName} in context due to null value.`);
+          }
         } else if (featureType === "N") {
           const valueType = typeof value;
-          self.assert(typeof value === "number", `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`);
+          self.assert(
+            typeof value === "number",
+            `Feature ${featureName} is expected to be numeric, but ${value} of type ${valueType} was passed.`,
+            errData
+          );
         } else if (featureType === "C") {
           self.assert(
             typeof value === "string",
-            `Feature ${featureName} is a categorical that expects a string, but ${value} is not a string.`
+            `Feature ${featureName} is a categorical that expects a string, but ${value} is not a string.`,
+            errData
           );
         } else if (featureType === "P") {
           self.assert(
             typeof value === "string" || self.isValidArray(value, "string"),
-            `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`
+            `Feature ${featureName} is a product set that expects an array or string, but ${value} is not an array or string.`,
+            errData
           );
         }
         filteredFeatures[featureName] = value;
       } catch (e) {
-        console.error(e);
-        console.error(`Not including ${featureName} in context due to invalid/unrecognized value.`)
+        const msg = `Not including ${featureName} in context due to invalid/unrecognized value.`;
+        this.logError(msg, {featureName: featureName}, e);
       }
     } else {
       console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`);
@@ -286,9 +332,11 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
 
 banditml.BanditAPI.prototype.validateAndFilterContext = function(context, experimentId) {
   const self = this;
+  const errData = {context: context, experimentId: experimentId};
   self.assert(
     typeof context === 'object' && context !== null,
-    "Context must be a non-null object."
+    "Context must be a non-null object.",
+    errData
   );
   let contextValidation = self.getItemFromStorage(self.contextValidationKey(experimentId));
   // load contextValidation if it doesn't exist or is more than 4 hours old
@@ -322,7 +370,7 @@ banditml.BanditAPI.prototype.setContext = async function(obj, experimentId) {
     this.setItemInStorage(this.contextName(experimentId), context);
     return context || {};
   } catch(e) {
-    console.error(e);
+    this.logError("Failed to set context", {context: context, experimentId: experimentId}, e);
     return context || {};
   }
 };
@@ -439,9 +487,13 @@ banditml.BanditAPI.prototype.getDecision = async function (
     );
   }
 
-  function setErrorRecs(e) {
-    console.error("Error getting decision, setting your default recs instead.")
-    console.error(e);
+  function setErrorRecs(e, errData) {
+    const errMsg = "Error getting decision, setting your default recs instead.";
+    errData = errData || {};
+    Object.assign(errData, {
+      experimentId: experimentId,
+    });
+    self.logError(errMsg, errData, e);
     // TODO: deal with error case for user if defaultDecisionIds is null?
     return self.setRecs(self.getControlRecs(defaultDecisionIds), filterRecs, populateDecisions);
   }
@@ -465,7 +517,7 @@ banditml.BanditAPI.prototype.getDecision = async function (
         context = await context;
       }
     } catch (e) {
-      return setErrorRecs(e);
+      return setErrorRecs(e, {context: context});
     }
   }
 
@@ -490,7 +542,7 @@ banditml.BanditAPI.prototype.getDecision = async function (
       if (self.config.debugMode) {
         console.log("Null cache passed back from Bandit ML server.");
       }
-    };
+    }
     let scoresById = loggedDecision.decision.ids.reduce((result, item, index) => {
       result[item] = loggedDecision.decision.scores[index];
       return result;
@@ -549,12 +601,13 @@ banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, e
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };
+  const mdpId = this.getSessionId();
   this.asyncPostRequest(this.banditLogDecisionEndpoint, headers, {
     id: decisionResponse.id,
     context: context,
     decision: decision,
     experimentId: experimentId,
-    mdpId: this.getSessionId(),
+    mdpId: mdpId,
     variantId: decision.variantId
   }).then(response => {
     if (this.config.debugMode) {
@@ -564,7 +617,16 @@ banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, e
     this.updateLastDecision(decision, experimentId);
     return response;
   }).catch(e => {
-    console.error(e);
+    this.logError(
+      "Failed to log decision.",
+      {
+        context: context,
+        decisionResponse: decisionResponse,
+        experimentId: experimentId,
+        mdpId: mdpId
+      },
+      e
+    );
   });
 };
 
@@ -574,13 +636,14 @@ banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision
   };
   this.assert(
     reward && typeof reward === "object", "Reward needs to be a non-empty object.");
-  this.asyncPostRequest(this.banditLogRewardEndpoint, headers, {
+  const postBody = {
     decisionId: decisionId,
     decision: decision,
     metrics: reward,
     experimentId: experimentId,
     mdpId: this.getSessionId()
-  }).then(response => {
+  };
+  this.asyncPostRequest(this.banditLogRewardEndpoint, headers, postBody).then(response => {
     if (this.config.debugMode) {
       console.log("Successfully logged reward.");
       console.log(response);
@@ -591,7 +654,7 @@ banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision
     }
     return response;
   }).catch(e => {
-    console.error(e);
+    this.logError("Failed to log reward", postBody, e);
   })
 };
 
