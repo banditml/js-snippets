@@ -378,6 +378,7 @@ banditml.BanditAPI.prototype.setContext = async function(obj, experimentId) {
 
 banditml.BanditAPI.prototype.clearContext = function(experimentId) {
   this.storage.removeItem(this.contextName(experimentId));
+  this.storage.removeItem(this.serverSideCacheKey(experimentId));
 };
 
 banditml.BanditAPI.prototype.updateContext = async function(newContext, experimentId) {
