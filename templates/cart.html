@@ -80,14 +80,20 @@
     <h2> Bandit ML Product Recommendation:</h2>
     <h3>You should also buy: </h3><p id="recommendationDiv"></p>
   </div>
+  <h3>Click to test click reward</h3>
   <div id="recsCategory" class="recsCategory">
-
+  </div>
+  <h3>Click to test purchase reward</h3>
+  <div id="recsCategoryPurchase" class="recsCategoryPurchase">
   </div>
 </div>
 <style>
   .recs {
     margin-top: 1500px;
     margin-bottom: 300px;
+  }
+  .recsCategoryPurchase {
+    margin-top: 50px;
   }
 </style>
 </body>
@@ -114,9 +120,11 @@
     if (Array.isArray(recs)) {
       recs.forEach(rec => {
         $("#recsCategory").append(`<a id="${rec}" class="banditRec" href="#">${rec}</a>`);
+        $("#recsCategoryPurchase").append(`<a id="${rec}" class="banditRecPurchase" href="#">${rec}</a>`);
       });
     } else {
       $("#recsCategory").append(`<a id="${recs}" class="banditRec" href="#">${recs}</a>`);
+      $("#recsCategoryPurchase").append(`<a id="${recs}" class="banditRecPurchase" href="#">${recs}</a>`);
     }
     return recs;
   }
@@ -129,11 +137,22 @@
       populateDecisions = modHtml
     ).then(function(response) {
       $(document).on('click', '.banditRec', function (e) {
+        const prodId = $(this).attr('id');
         bandit.logReward(
           reward={click:1},
           experimentId=experimentId,
-          decision=$(this).attr('id'),
+          decision=prodId,
           decisionId=response.decision.id
+        )
+      });
+
+      $(document).on('click', '.banditRecPurchase', function (e) {
+        const prodId = $(this).attr('id');
+        bandit.logReward(
+          reward={[prodId]:{purchase: 20}},
+          experimentId=experimentId,
+          decision=null,
+          decisionId=null
         )
       });
     });

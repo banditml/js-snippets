@@ -9,4 +9,4 @@ let experimentId = "18c08829-e49e-421f-a13b-77e7d6d0221b";
 function getSessionIdCustom () {
   return "1235"
 }
-let bandit = new banditml.BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});
+let bandit = new banditml.BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {debugMode: true, banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});
