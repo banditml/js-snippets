@@ -123,9 +123,10 @@ banditml.BanditAPI.prototype.updateSessionId = function() {
   return sessionId;
 };
 
-banditml.BanditAPI.prototype.clearSession = function() {
+banditml.BanditAPI.prototype.clearSession = function(experimentId) {
   this.storage.removeItem(this.sessionIdKey);
   this.storage.removeItem(this.lastActionTimeKey);
+  this.clearContext(experimentId);
 };
 
 banditml.BanditAPI.prototype.getSessionId = function() {
@@ -650,7 +651,7 @@ banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision
     }
     if (decisionId === null) {
       // TODO: edge case - do we clear session in case of failures too?
-      this.clearSession();
+      this.clearSession(experimentId);
     }
     return response;
   }).catch(e => {
