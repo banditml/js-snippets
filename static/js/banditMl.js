@@ -434,7 +434,8 @@ banditml.BanditAPI.prototype.getControlRecs = async function (defaultDecisionIds
 banditml.BanditAPI.prototype.setRecs = async function (
   decisionIds = null,
   filterRecs = null,
-  populateDecisions = null
+  populateDecisions = null,
+  variantSlug = null
 ) {
   const self = this;
   if (decisionIds.then) {
@@ -444,7 +445,7 @@ banditml.BanditAPI.prototype.setRecs = async function (
   if (filterRecs) {
     self.assert(self.isFunction(filterRecs), "filterRecs must be a function.");
     // filterRecs can be function that directly returns IDs or promise
-    let result = filterRecs(decisionIds);
+    let result = filterRecs(decisionIds, variantSlug);
     if (result) {
       if (result.then) {
         decisionIds = await result;
@@ -565,11 +566,12 @@ banditml.BanditAPI.prototype.getDecision = async function (
       } else {
         decisionIds = originalIds;
       }
-      decisionIds = await self.setRecs(decisionIds, filterRecs, populateDecisions);
+      decisionIds = await self.setRecs(
+        decisionIds, filterRecs, populateDecisions, loggedDecision.decision.variantSlug);
       loggedDecision.decision.ids = decisionIds;
     } else {
       decisionIds = loggedDecision.decision.ids;
-      await self.setRecs(decisionIds, filterRecs, populateDecisions);
+      await self.setRecs(decisionIds, filterRecs, populateDecisions, loggedDecision.decision.variantSlug);
     }
     loggedDecision.decision.scores = loggedDecision.decision.ids.map(id => {
       return scoresById[id];
