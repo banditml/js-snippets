@@ -112,10 +112,10 @@
   }
 
   // pset case
-  function filterRecs(recs, customId) {
-    if (customId === "variant-74") {
+  function filterRecs(recs, variantSlug) {
+    if (variantSlug === "variant-74") {
       return ["x", "y"]
-    } else if (customId === "variant-72") {
+    } else if (variantSlug === "variant-72") {
       return ["r", "u"]
     }
     return recs.splice(0, 2);
