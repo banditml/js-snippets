@@ -112,8 +112,13 @@
   }
 
   // pset case
-  function filterRecs(recs) {
-    return recs.slice(0, 2);
+  function filterRecs(recs, customId) {
+    if (customId === "variant-74") {
+      return ["x", "y"]
+    } else if (customId === "variant-72") {
+      return ["r", "u"]
+    }
+    return recs.splice(0, 2);
   }
 
   async function modHtml(recs) {
