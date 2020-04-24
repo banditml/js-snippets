@@ -50,9 +50,12 @@ banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {})
   this.decisionsLoggedById = {};
   let defaultConfig = {
     debugMode: false,
+    debugOptions: {
+      forceVariantSlug: null
+    },
     sessionLengthHrs: 0.5,
     banditHostUrl: "https://www.banditml.com/api/",
-    getSessionId: null
+    getSessionId: null,
   };
   this.config = Object.assign(defaultConfig, config);
   this.banditDecisionEndpoint = `${this.config.banditHostUrl}decision`;
@@ -526,11 +529,20 @@ banditml.BanditAPI.prototype.getDecision = async function (
 
   // check for cache object locally which holds auto-context
   let cache = self.getItemFromStorage(self.serverSideCacheKey(experimentId));
+  const forceVariantSlug = self.config.debugOptions.forceVariantSlug;
+  if (forceVariantSlug) {
+    console.log(`Forcing variant: ${forceVariantSlug}`);
+  }
 
   // call gradient-app and get a decision
   let decisionPromise = self.asyncGetRequest(
     url = self.banditDecisionEndpoint,
-    params = {context: context, experimentId: experimentId, cache: cache},
+    params = {
+      context: context,
+      experimentId: experimentId,
+      cache: cache,
+      forceVariantSlug: forceVariantSlug
+    },
     headers = {
       "Authorization": `ApiKey ${self.banditApikey}`
     }

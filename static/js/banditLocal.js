@@ -5,10 +5,10 @@
 // product set case
 // let experimentId = "18c08829-e49e-421f-a13b-77e7d6d0221b";
 // product set multi-dynamic case
-let experimentId = "701c214c-14ed-4fc2-828c-452d61c2b670";
+let experimentId = "7703f35c-f0a5-42a3-b0d9-d29c3952bd97";
 // category case
 // let experimentId = "59204365-5e27-4c8c-a21b-e1a81d373979";
 function getSessionIdCustom () {
   return "1235"
 }
-let bandit = new banditml.BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {debugMode: true, banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});
+let bandit = new banditml.BanditAPI("c52e1439-77bc-3cfd-b422-6a4d9a1e2c8c", {[experimentId]: "recsCategory"}, {debugMode: true, debugOptions: {forceVariantSlug: "variant-74"}, banditHostUrl: "http://localhost:8000/api/", getSessionId: getSessionIdCustom});
