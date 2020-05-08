@@ -108,16 +108,11 @@
   {#}#}
 
   function defaultProductRecs() {
-    return ['prod_kpnNwAKOX5mXB3', 'prod_ypbroEnJ158n4e', 'prod_kpnNwAbX9omXB3'];
+    return ['x', 'y'];
   }
 
   // pset case
   function filterRecs(recs, variantSlug) {
-    if (variantSlug === "variant-74") {
-      return ["x", "y"]
-    } else if (variantSlug === "variant-72") {
-      return ["r", "u"]
-    }
     return recs.splice(0, 2);
   }
 
