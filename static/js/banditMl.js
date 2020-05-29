@@ -570,24 +570,19 @@ banditml.BanditAPI.prototype.getDecision = async function (
       console.log(loggedDecision);
     }
     let decisionIds;
-    if (loggedDecision.decision.type === "D") {
-      const originalIds = loggedDecision.decision.ids;
-      if (defaultDecisionIds) {
-        if (response.decision.isControl) {
-          decisionIds = await self.getControlRecs(defaultDecisionIds);
-        } else {
-          decisionIds = originalIds;
-        }
+    const originalIds = loggedDecision.decision.ids;
+    if (defaultDecisionIds) {
+      if (response.decision.isControl) {
+        decisionIds = await self.getControlRecs(defaultDecisionIds);
       } else {
         decisionIds = originalIds;
       }
-      decisionIds = await self.setRecs(
-        decisionIds, filterRecs, populateDecisions, loggedDecision.decision.variantSlug);
-      loggedDecision.decision.ids = decisionIds;
     } else {
-      decisionIds = loggedDecision.decision.ids;
-      await self.setRecs(decisionIds, filterRecs, populateDecisions, loggedDecision.decision.variantSlug);
+      decisionIds = originalIds;
     }
+    decisionIds = await self.setRecs(
+      decisionIds, filterRecs, populateDecisions, loggedDecision.decision.variantSlug);
+    loggedDecision.decision.ids = decisionIds;
     loggedDecision.decision.scores = loggedDecision.decision.ids.map(id => {
       return scoresById[id];
     });
