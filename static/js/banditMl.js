@@ -458,7 +458,7 @@ banditml.BanditAPI.prototype.setRecs = async function (
     }
   }
   if (self.config.debugMode) {
-    console.log("After filtering, the following recs will be shown:");
+    console.log("After filtering, the following recs will be shown and logged:");
     console.log(decisionIds);
   }
   if (populateDecisions) {
@@ -469,9 +469,12 @@ banditml.BanditAPI.prototype.setRecs = async function (
     let result = populateDecisions(decisionIds);
     if (result) {
       if (result.then) {
-        decisionIds = await result;
-      } else {
-        decisionIds = result;
+        result = await result;
+      }
+      if (self.config.debugMode) {
+        if (result !== decisionIds) {
+          console.warn('populateDecisions function is returning a different result than filterRecs. Ensure that populateDecisions is not modifying decisions.');
+        }
       }
     }
   }
