@@ -473,7 +473,7 @@ banditml.BanditAPI.prototype.setRecs = async function (
       }
       if (self.config.debugMode) {
         if (result !== decisionIds) {
-          console.warn('populateDecisions function is returning a different result than filterRecs. Ensure that populateDecisions is not modifying decisions.');
+          console.warn(`populateDecisions function is returning a different result (${result}) than filterRecs (${decisionIds}). Ensure that populateDecisions is not modifying decisions.`);
         }
       }
     }
