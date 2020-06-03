@@ -649,7 +649,7 @@ banditml.BanditAPI.prototype.logDecision = function(context, decisionResponse, e
   });
 };
 
-banditml.BanditAPI.prototype.logReward = function(reward, experimentId, decision = null, decisionId = null) {
+banditml.BanditAPI.prototype.logReward = function(reward, experimentId = null, decision = null, decisionId = null) {
   const headers = {
     "Authorization": `ApiKey ${this.banditApikey}`
   };

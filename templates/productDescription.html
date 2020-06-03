@@ -5,17 +5,12 @@
 <link rel="stylesheet" href={{url_for('static', filename='css/productDescription.css')}} />
 <link rel="stylesheet" href={{ url_for('static', filename='css/topStyle.css')}} />
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
 <!-- <script type="text/javascript" src="https://gradient-app-bucket-public-staging.s3.amazonaws.com/snippets/banditMl.min.js"></script> -->
 <script src={{ url_for('static', filename='js/banditMl.js') }}></script>
-
+<script src={{ url_for('static', filename='js/banditLocal.js') }}></script>
 
 <script>
-	let banditExperimentId = "2452b52a-8bda-4fb5-b0cd-832e0683d601";
-	let bandit = new  window.BanditAPI(
-		apiKey = "b3496e1b-228f-33fd-9887-883e8f15d7e1",
-		recClassByExperimentId = {[banditExperimentId]: "product-recs"},
-		config = {debugMode: true, banditHostUrl: "https://www.16ounc.es/api/"}
-	);
 
 	function defaultDecisionIds() {
 		let result = null
@@ -43,7 +38,7 @@
 		});
  	};
 
-	// old recommendation logic
+	// // old recommendation logic
 	// $.when(defaultDecisionIds()).then(function(recs) {
 	//   filteredRecs = filterRecs(recs);
 	// 	populateDecisions(filteredRecs);
@@ -54,9 +49,9 @@
 		currentlyViewingProduct: "{{cleanedName}}",
 		trafficSource: "google",
 		totalCartValue: null,
-	},banditExperimentId).then(function () {
+	},experimentId).then(function () {
 		bandit.getDecision(
-			banditExperimentId,
+			experimentId,
 			defaultDecisionIds = defaultDecisionIds,
 			filterRecs = filterRecs,
 			populateDecisions = populateDecisions
@@ -64,7 +59,7 @@
 			$('.productRec').click(function () {
 			  bandit.logReward(
 				  reward = {click: 1},
-				  experimentId = banditExperimentId,
+				  experimentId = experimentId,
 				  decision = $(this).attr('id'),
 				  decisionId = response.decision.id);
 			});
@@ -76,10 +71,12 @@
 	  	bandit.logReward({
 				"Computer-1": {"purchase": 39.99},
 				"Mens-Tshirt-2": {"purchase": 19.99}
-			}, banditExperimentId);
+			}, experimentId);
 		});
 	});
 
+	// log all item views to be used in collaborative filtering
+	bandit.logReward({"{{cleanedName}}": {"view": 1}});
 
 </script>
 
