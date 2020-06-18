@@ -66,6 +66,9 @@ banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {})
 
   // URLs & hosts
   this.ipUrl = "https://api.ipify.org?format=json";
+
+  // special features known to backend
+  this.reservedFeatures = ["ipAddress"]
 };
 
 banditml.BanditAPI.prototype.addDecisionHandler = function (context, decision, experimentId) {
@@ -282,8 +285,8 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
   };
   let filteredFeatures = {};
   for (const featureName in context) {
-    if (featureName === "ipAddress") {
-      filteredFeatures.ipAddress = context.ipAddress;
+    if (self.reservedFeatures.includes(featureName)) {
+      filteredFeatures[featureName] = context[featureName];
       continue;
     }
 
@@ -328,7 +331,8 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
         this.logError(msg, {featureName: featureName}, e);
       }
     } else {
-      console.warn(`Feature ${featureName} is not recognized by the model. Please update your model to include this feature.`);
+      console.warn(`Feature ${featureName} is not defined in experiment context. Including it, but check experiment dash.`);
+      filteredFeatures[featureName] = context[featureName];
     }
   }
   return filteredFeatures;

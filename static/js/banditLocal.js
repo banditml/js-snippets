@@ -5,6 +5,6 @@ let bandit = new banditml.BanditAPI(
   config = {
     debugMode: true,
     banditHostUrl: "http://localhost:8000/api/",
-    debugOptions: {forceVariantSlug: "bandit"}
+    debugOptions: {forceVariantSlug: "tf"}
   }
 );
