@@ -671,10 +671,6 @@ banditml.BanditAPI.prototype.logReward = function(reward, experimentId = null, d
       console.log("Successfully logged reward.");
       console.log(response);
     }
-    if (decisionId === null) {
-      // TODO: edge case - do we clear session in case of failures too?
-      this.clearSession(experimentId);
-    }
     return response;
   }).catch(e => {
     this.logError("Failed to log reward", postBody, e);
