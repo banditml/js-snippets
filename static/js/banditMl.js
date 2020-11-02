@@ -54,7 +54,7 @@ banditml.BanditAPI = function (apiKey, recClassByExperimentId = {}, config = {})
       forceVariantSlug: null
     },
     sessionLengthHrs: 0.5,
-    banditHostUrl: "https://www.banditml.com/api/",
+    banditHostUrl: "https://app.banditml.com/api/",
     getSessionId: null,
   };
   this.config = Object.assign(defaultConfig, config);
