@@ -331,7 +331,8 @@ banditml.BanditAPI.prototype.validateAndFilterFeaturesInContext = function (cont
         this.logError(msg, {featureName: featureName}, e);
       }
     } else {
-      console.warn(`Feature ${featureName} is not defined in experiment context. Including it, but check experiment dash.`);
+      // This is noisy, so let's silence it for now
+      // console.warn(`Feature ${featureName} is not defined in experiment context. Including it, but check experiment dash.`);
       filteredFeatures[featureName] = context[featureName];
     }
   }
@@ -513,16 +514,21 @@ banditml.BanditAPI.prototype.getDecision = async function (
 
   let context = self.getContext(experimentId);
   if (!('ipAddress' in context)) {
+    let ipResult;
     try {
-      let ipPromise = self.asyncGetRequest(
-        self.ipUrl,
-        params = {},
-        headers = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      );
-      let ipResult = await ipPromise;
+      try {
+        let ipPromise = self.asyncGetRequest(
+          self.ipUrl,
+          params = {},
+          headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        );
+        ipResult = await ipPromise;
+      } catch (err) {
+        ipResult = {"ip": "unset-IP-session-" + this.getSessionId()};
+      }
       const ipAddress = ipResult.ip;
       context.ipAddress = ipAddress;
       context = self.updateContext(context, experimentId);

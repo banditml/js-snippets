@@ -3,14 +3,12 @@
 Installation:
 Create a virtualenv and install requirements
 ```
-virtualenv env
-. env/bin/activate
-pip install -r requirements.txt
+pipenv install
 ```
 
 Start the server:
 ```
-python main.py
+pipenv run python main.py
 ```
 
 Deploy to heroku (on master branch):
