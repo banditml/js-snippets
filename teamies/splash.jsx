@@ -26,7 +26,7 @@ const App = () => {
     <div>
       <Navigation />
       <Header data={landingPageData.Header} />
-      <Hero text="Virtual Team Building Events" />
+      <Hero text="Team Building Events for All Team Sizes" />
       <Features data={landingPageData.Features} />
       <About data={landingPageData.About} />
       <Services data={landingPageData.Services} />
