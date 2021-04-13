@@ -6,7 +6,7 @@ refinery.RefineryAPI = function (config = {}) {
 
   let defaultConfig = {
     debugMode: false,
-    refineryHostUrl: "http://localhost:8000/api/v2/",
+    refineryHostUrl: "https://app.banditml.com/api/v2",
   };
   this.config = Object.assign(defaultConfig, config);
 
