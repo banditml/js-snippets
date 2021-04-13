@@ -69,7 +69,7 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
     // right now we assume 1 changeset only, so grab the first i.e. [0]
     let changes = response[0].changes;
     changes.forEach(change => {
-      if (window.location.href == change.href) {
+      if (window.location.href === change.href) {
         let domPath = document.querySelector(change.domPath);
         if (domPath.innerHTML != change.beforeHtml) {
           console.warn(`Can't apply change on '${change.beforeHtml}' because copy doesn't match.\
