@@ -1,4 +1,4 @@
-# Sample e-commerce site for testing Bandit ML
+# Repo of JS snippets + sample e-commerce site for testing snippets
 
 Installation:
 Create a virtualenv and install requirements
