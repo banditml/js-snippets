@@ -71,7 +71,7 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
     changes.forEach(change => {
       if (window.location.href === change.href) {
         let domPath = document.querySelector(change.domPath);
-        if (domPath.innerHTML != change.beforeHtml) {
+        if (domPath.innerHTML !== change.beforeHtml) {
           console.warn(`Can't apply change on '${change.beforeHtml}' because copy doesn't match.\
  '${change.beforeHtml}' vs. '${domPath.innerHTML}'.`);
         } else {
