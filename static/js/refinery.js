@@ -68,7 +68,6 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
   self.getLiveRefinement().then(response => {
     // right now we assume 1 changeset only, so grab the first i.e. [0]
     let changes = response[0].changes;
-    console.log(changes)
     changes.forEach(change => {
       if (window.location.href == change.href) {
         let domPath = document.querySelector(change.domPath);
@@ -89,4 +88,4 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
 }
 
 let refineryAPI = new refinery.RefineryAPI();
-refineryAPI.applyChanges()
+refineryAPI.applyChanges();
