@@ -2,19 +2,19 @@ window.refinery = window.refinery || {};
 
 refinery.RefineryAPI = function (config = {}) {
   this.storage = window.localStorage;
-  this.refineryApikey = this.getApiKeyFromScriptTag();
+  this.refineryAppToken = this.getAppTokenFromScriptTag();
 
   let defaultConfig = {
     debugMode: false,
-    refineryHostUrl: "https://app.banditml.com/api/v2",
+    refineryHostUrl: "https://app.banditml.com/api/v2/",
   };
   this.config = Object.assign(defaultConfig, config);
 
   this.refineryLiveRefinementEndpoint = `${this.config.refineryHostUrl}changesets`;
 };
 
-refinery.RefineryAPI.prototype.getApiKeyFromScriptTag = function () {
-  return document.currentScript.getAttribute('apiKey');
+refinery.RefineryAPI.prototype.getAppTokenFromScriptTag = function () {
+  return document.currentScript.getAttribute('appToken');
 };
 
 refinery.RefineryAPI.prototype.asyncGetRequest = async function(
@@ -53,7 +53,7 @@ refinery.RefineryAPI.prototype.getLiveRefinement = function() {
     url = self.refineryLiveRefinementEndpoint,
     params = {},
     headers = {
-      "x-chrome-installation": `${self.refineryApikey}`
+      "x-app-token": `${self.refineryAppToken}`
     }
   );
   return changesPromise.then(response => {
@@ -67,8 +67,11 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
   const self = this;
   self.getLiveRefinement().then(response => {
     // right now we assume 1 changeset only, so grab the first i.e. [0]
-    let changes = response[0].changes;
-    changes.forEach(change => {
+    let changeset = response[0];
+    let changes;
+    (changeset.publish) ? changes = changeset.changes : changes = [];
+
+    changes.filter(change => !change.deleted).forEach(change => {
       if (window.location.href === change.href) {
         let elem = document.querySelector(change.domPath);
         if (elem.innerHTML !== change.beforeHtml) {
