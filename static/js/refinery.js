@@ -63,6 +63,23 @@ refinery.RefineryAPI.prototype.getLiveRefinement = function() {
   });
 };
 
+refinery.RefineryAPI.prototype.applyChange = function(change) {
+  if (window.location.href === change.href) {
+    let elem = document.querySelector(change.domPath);
+    if (elem.innerHTML.trim() !== change.beforeHtml.trim()) {
+      console.warn(`Can't apply change on '${change.beforeHtml}' because copy doesn't match.\
+'${change.beforeHtml.trim()}' vs. '${elem.innerHTML.trim()}'.`);
+    } else {
+        console.log(change.afterHtml);
+        elem.innerHTML = change.afterHtml;
+    }
+  } else {
+    console.warn(`
+      Can't apply change on '${change.beforeHtml}' because href's don't match.\
+'${change.href}' vs. '${window.location.href}'.`);
+  }
+};
+
 refinery.RefineryAPI.prototype.applyChanges = function() {
   const self = this;
   self.getLiveRefinement().then(response => {
@@ -70,24 +87,11 @@ refinery.RefineryAPI.prototype.applyChanges = function() {
     let changeset = response[0];
     let changes;
     (changeset.publish) ? changes = changeset.changes : changes = [];
-
     changes.filter(change => !change.deleted).forEach(change => {
-      if (window.location.href === change.href) {
-        let elem = document.querySelector(change.domPath);
-        if (elem.innerHTML !== change.beforeHtml) {
-          console.warn(`Can't apply change on '${change.beforeHtml}' because copy doesn't match.\
- '${change.beforeHtml}' vs. '${elem.innerHTML}'.`);
-        } else {
-            elem.innerHTML = change.afterHtml;
-        }
-      } else {
-        console.warn(`
-          Can't apply change on '${change.beforeHtml}' because href's don't match.\
- '${change.href}' vs. '${window.location.href}'.`);
-      }
+      self.applyChange(change);
+
     });
   });
-
 }
 
 let refineryAPI = new refinery.RefineryAPI();
