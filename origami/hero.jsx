@@ -61,15 +61,15 @@ const Hero = ({
         <div className={innerClasses}>
           <div className="hero-content">
             <h1 className="mt-0 mb-16 reveal-from-bottom" data-reveal-delay="200">
-              Sushi delivered, always at happy hour prices.
+              The best bay area sushi, delivered.
             </h1>
             <div className="container-xs">
               <p className="m-0 mb-32 reveal-from-bottom" data-reveal-delay="400">
-                We are serving all of America's favorite sushi rolls.
+                High quality nigiri, sashimi, and rolls at the best prices.
                 </p>
               <div className="reveal-from-bottom" data-reveal-delay="600">
                 <Button tag="a" color="primary" wideMobile href="https://www.eats.co/origami">
-                    Order now
+                    Order
                 </Button>
               </div>
             </div>
