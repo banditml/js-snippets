@@ -61,7 +61,7 @@ const Menu = ({
         <div className={innerClasses}>
           <div className="menu-content">
             <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-delay="200">
-              Maki rolls
+              Maki
             </h3>
             <div className="menu-figure reveal-from-bottom illustration-element-01" data-reveal-value="20px" data-reveal-delay="800">
               {props.menu.items.maki}
