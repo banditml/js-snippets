@@ -74,20 +74,21 @@ refinery.RefineryAPI.prototype.getLiveRefinement = function () {
   });
 };
 
-refinery.RefineryAPI.prototype.applyChange = function (change) {
-  if (window.location.href === change.href) {
-    let elem = document.querySelector(change.dom_path);
-    if (elem.innerHTML.trim() !== change.before_html.trim()) {
-      console.warn(`Can't apply change on '${change.before_html}' because copy doesn't match.\
-'${change.before_html.trim()}' vs. '${elem.innerHTML.trim()}'.`);
-    } else {
-        elem.innerHTML = change.after_html;
-        return true;
-    }
-  } else {
+refinery.RefineryAPI.prototype.applyChange = function (change, element) {
+  if (!(window.location.href === change.href)) {
     console.warn(`
       Can't apply change on '${change.before_html}' because href's don't match.\
 '${change.href}' vs. '${window.location.href}'.`);
+    return false;
+  }
+
+  let elem = element || document.querySelector(change.dom_path);
+  if (elem.innerHTML.trim() !== change.before_html.trim()) {
+    console.warn(`Can't apply change on '${change.before_html}' because copy doesn't match.\
+'${change.before_html.trim()}' vs. '${elem.innerHTML.trim()}'.`);
+  } else {
+    elem.innerHTML = change.after_html;
+    return true;
   }
   return false;
 };
@@ -97,37 +98,48 @@ refinery.RefineryAPI.prototype.cacheChanges = function (changes) {
   self.setItemInStorage(self.refineryAppToken, changes)
 };
 
-refinery.RefineryAPI.prototype.applyChangesFromCache = function () {
+refinery.RefineryAPI.prototype.getChangesFromProd = function () {
   const self = this;
-  const changes = this.getItemFromStorage(self.refineryAppToken) || [];
-  const changesAppliedFromCache = new Set();
-  changes.filter(change => !change.deleted).forEach(change => {
-    const changeApplied = self.applyChange(change);
-    if (changeApplied) changesAppliedFromCache.add(change.id);
+  return self.getLiveRefinement().then(response => {
+    return response.filter(change => !change.deleted);
   });
-  return changesAppliedFromCache;
 };
 
-refinery.RefineryAPI.prototype.applyChangesFromProd = function (changesAppliedFromCache) {
+refinery.RefineryAPI.prototype.applyChangesToMutations = function (mutationsList, changes, changesApplied) {
   const self = this;
-  const changesToCache = [];
-  self.getLiveRefinement().then(response => {
-    let changes = response;
-    changes.filter(change => !change.deleted).forEach(change => {
-      if (!(changesAppliedFromCache.has(change.id))) {
-          // the change hasn't been applied from the cache so we must apply it
-          // this works as long as we don't allow edits to changes (we currently don't)
-          // once we do, then we will need to make a check if the change has changed -_-
-          self.applyChange(change);
-      }
-      changesToCache.push(change);
-    });
-    self.cacheChanges(changesToCache);
-  });
+  changesApplied = changesApplied || new Set();
+  mutationsList.forEach((mutation) => {
+    if (mutation.type === 'childList') {
+      mutation.addedNodes.forEach((node) => {
+        changes.forEach((change) => {
+          let matchingElement = node.querySelector(change.dom_path);
+          if (matchingElement) {
+            if (!(changesApplied.has(change.id))) {
+              const changeApplied = self.applyChange(change, matchingElement);
+              if (changeApplied) changesApplied.add(change.id)
+            }
+          }
+        })
+      })
+    }
+  })
+  return changesApplied;
 };
 
 let refineryAPI = new refinery.RefineryAPI();
+
+const actOnBodyMutation = (mutationsList) => {
+  // first apply cached changes
+  const cachedChanges = refineryAPI.getItemFromStorage(refineryAPI.refineryAppToken) || [];
+  const changesApplied = refineryAPI.applyChangesToMutations(mutationsList, cachedChanges);
+  // then apply changes from production
+  refineryAPI.getChangesFromProd().then(prodChanges => {
+    refineryAPI.applyChangesToMutations(mutationsList, prodChanges, changesApplied);
+    refineryAPI.cacheChanges(prodChanges);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', (event) => {
-  const changesAppliedFromCache = refineryAPI.applyChangesFromCache();
-  refineryAPI.applyChangesFromProd(changesAppliedFromCache);
+  const bodyObserver = new MutationObserver(actOnBodyMutation)
+  bodyObserver.observe(document.body, { childList: true, subtree: true })
 })
