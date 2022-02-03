@@ -1,26 +1,7 @@
-# Repo of JS snippets + sample e-commerce site for testing snippets
+# Collection of public Bandit ML JS snippets
 
-Installation:
-Create a virtualenv and install requirements
-```
-pipenv install
-```
-
-Start the server:
-```
-pipenv run python main.py
-```
-
-Deploy to heroku (on master branch):
-
-Get added as a collaborator to `dry-hamlet-33451`.
+Bandit ML JS SDK:
 
 ```
-git push heroku master
-```
-
-Deploy current branch to heroku:
-
-```
-git push -f heroku HEAD:master
+static/js/banditMl.js
 ```
